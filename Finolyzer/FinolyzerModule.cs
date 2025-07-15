@@ -95,9 +95,9 @@ namespace Finolyzer;
     //typeof(AbpFeatureManagementApplicationModule),
 
     // Setting Management module packages
-    typeof(AbpSettingManagementWebModule),
-    typeof(AbpSettingManagementHttpApiModule),
-    typeof(AbpSettingManagementApplicationModule),
+    //typeof(AbpSettingManagementWebModule),
+    //typeof(AbpSettingManagementHttpApiModule),
+    //typeof(AbpSettingManagementApplicationModule),
 
     // Entity Framework Core packages for the used modules
     typeof(AbpAuditLoggingEntityFrameworkCoreModule),
@@ -127,28 +127,28 @@ public class FinolyzerModule : AbpModule
             );
         });
 
-        PreConfigure<OpenIddictBuilder>(builder =>
-        {
-            builder.AddValidation(options =>
-            {
-                options.AddAudiences("Finolyzer");
-                options.UseLocalServer();
-                options.UseAspNetCore();
-            });
-        });
+        //PreConfigure<OpenIddictBuilder>(builder =>
+        //{
+        //    builder.AddValidation(options =>
+        //    {
+        //        options.AddAudiences("Finolyzer");
+        //        options.UseLocalServer();
+        //        options.UseAspNetCore();
+        //    });
+        //});
 
-        if (!hostingEnvironment.IsDevelopment())
-        {
-            PreConfigure<AbpOpenIddictAspNetCoreOptions>(options =>
-            {
-                options.AddDevelopmentEncryptionAndSigningCertificate = false;
-            });
+        //if (!hostingEnvironment.IsDevelopment())
+        //{
+        //    PreConfigure<AbpOpenIddictAspNetCoreOptions>(options =>
+        //    {
+        //        options.AddDevelopmentEncryptionAndSigningCertificate = false;
+        //    });
 
-            PreConfigure<OpenIddictServerBuilder>(serverBuilder =>
-            {
-                serverBuilder.AddProductionEncryptionAndSigningCertificate("openiddict.pfx", configuration["AuthServer:CertificatePassPhrase"]!);
-            });
-        }
+        //    PreConfigure<OpenIddictServerBuilder>(serverBuilder =>
+        //    {
+        //        serverBuilder.AddProductionEncryptionAndSigningCertificate("openiddict.pfx", configuration["AuthServer:CertificatePassPhrase"]!);
+        //    });
+        //}
 
         FinolyzerGlobalFeatureConfigurator.Configure();
         FinolyzerModuleExtensionConfigurator.Configure();
@@ -165,8 +165,8 @@ public class FinolyzerModule : AbpModule
             context.Services.Replace(ServiceDescriptor.Singleton<IEmailSender, NullEmailSender>());
         }
 
-        ConfigureAuthentication(context);
-        ConfigureMultiTenancy();
+        //ConfigureAuthentication(context);
+        //ConfigureMultiTenancy();
         ConfigureUrls(configuration);
         ConfigureBundles();
         ConfigureHealthChecks(context);
@@ -363,17 +363,17 @@ public class FinolyzerModule : AbpModule
         app.MapAbpStaticAssets();
         app.UseAbpStudioLink();
         app.UseAbpSecurityHeaders();
-        app.UseAuthentication();
-        app.UseAbpOpenIddictValidation();
+        //app.UseAuthentication();
+        //app.UseAbpOpenIddictValidation();
 
-        if (IsMultiTenant)
-        {
-            app.UseMultiTenancy();
-        }
+        //if (IsMultiTenant)
+        //{
+        //    app.UseMultiTenancy();
+        //}
 
         app.UseUnitOfWork();
         app.UseDynamicClaims();
-        app.UseAuthorization();
+        //app.UseAuthorization();
 
         app.UseSwagger();
         app.UseAbpSwaggerUI(options =>

@@ -14,11 +14,11 @@ public class EditModalModel : AbpPageModel
     public Guid Id { get; set; }
 
     [BindProperty]
-    public CreateUpdateBookDto Book { get; set; }
+    public CreateUpdateCostSummaryRequestDto Book { get; set; }
 
-    private readonly IBookAppService _bookAppService;
+    private readonly ICostSummaryRequestAppService _bookAppService;
 
-    public EditModalModel(IBookAppService bookAppService)
+    public EditModalModel(ICostSummaryRequestAppService bookAppService)
     {
         _bookAppService = bookAppService;
     }
@@ -26,7 +26,7 @@ public class EditModalModel : AbpPageModel
     public async Task OnGetAsync()
     {
         var bookDto = await _bookAppService.GetAsync(Id);
-        Book = ObjectMapper.Map<BookDto, CreateUpdateBookDto>(bookDto);
+        Book = ObjectMapper.Map<CostSummaryRequestDto, CreateUpdateCostSummaryRequestDto>(bookDto);
     }
 
     public async Task<IActionResult> OnPostAsync()

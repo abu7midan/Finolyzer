@@ -8,9 +8,9 @@ public class FinolyzerAutoMapperProfile : Profile
 {
     public FinolyzerAutoMapperProfile()
     {
-        CreateMap<Book, BookDto>();
-        CreateMap<CreateUpdateBookDto, Book>();
-        CreateMap<BookDto, CreateUpdateBookDto>();
+        CreateMap<Book, CostSummaryRequestDto>();
+        CreateMap<CreateUpdateCostSummaryRequestDto, Book>();
+        CreateMap<CostSummaryRequestDto, CreateUpdateCostSummaryRequestDto>();
         /* Create your AutoMapper object mappings here */
     }
 }

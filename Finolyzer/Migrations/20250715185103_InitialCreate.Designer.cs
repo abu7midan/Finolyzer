@@ -13,7 +13,7 @@ using Volo.Abp.EntityFrameworkCore;
 namespace Finolyzer.Migrations
 {
     [DbContext(typeof(FinolyzerDbContext))]
-    [Migration("20250715132414_InitialCreate")]
+    [Migration("20250715185103_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -22,7 +22,7 @@ namespace Finolyzer.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("_Abp_DatabaseProvider", EfCoreDatabaseProvider.SqlServer)
-                .HasAnnotation("ProductVersion", "9.0.4")
+                .HasAnnotation("ProductVersion", "9.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -643,6 +643,9 @@ namespace Finolyzer.Migrations
                         .HasColumnType("nvarchar(max)")
                         .HasColumnName("ExtraProperties");
 
+                    b.Property<int>("IntegrationServiceId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("LastModificationTime")
                         .HasColumnType("datetime2")
                         .HasColumnName("LastModificationTime");
@@ -657,6 +660,9 @@ namespace Finolyzer.Migrations
                     b.Property<int>("RequestType")
                         .HasColumnType("int");
 
+                    b.Property<float>("TotalCost")
+                        .HasColumnType("real");
+
                     b.Property<double>("UsageCount")
                         .HasColumnType("float");
 
@@ -666,6 +672,8 @@ namespace Finolyzer.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ApplicationSystemId");
+
+                    b.HasIndex("IntegrationServiceId");
 
                     b.HasIndex("Day", "Month", "Year")
                         .IsUnique();
@@ -1279,7 +1287,15 @@ namespace Finolyzer.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
+                    b.HasOne("Finolyzer.Entities.IntegrationService", "IntegrationService")
+                        .WithMany()
+                        .HasForeignKey("IntegrationServiceId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
                     b.Navigation("ApplicationSystem");
+
+                    b.Navigation("IntegrationService");
                 });
 
             modelBuilder.Entity("Volo.Abp.AuditLogging.AuditLogAction", b =>

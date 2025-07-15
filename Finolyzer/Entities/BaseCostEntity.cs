@@ -176,12 +176,16 @@ public class SystemIntegrationTransaction : AuditedAggregateRoot<int>
     public int Year { get; set; }
     public int Month { get; set; }
     public int Day { get; set; }
+    public float TotalCost { get; set; }
 
     public double UsageCount { get; set; }
+    public IntegrationService IntegrationService { get; set; }
+    public int IntegrationServiceId { get; set; }
 
-    public TimlyRequestType RequestType { get; set; }
     public ApplicationSystem ApplicationSystem { get; set; }
     public int ApplicationSystemId { get; set; }
+
+    public TimlyRequestType RequestType { get; set; }
 
 }
 //public class SystemResource : BaseCostEntity

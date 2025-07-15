@@ -420,36 +420,6 @@ namespace Finolyzer.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "SystemIntegrationTransactions",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    Description = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: false),
-                    Year = table.Column<int>(type: "int", nullable: false),
-                    Month = table.Column<int>(type: "int", nullable: false),
-                    Day = table.Column<int>(type: "int", nullable: false),
-                    UsageCount = table.Column<double>(type: "float", nullable: false),
-                    RequestType = table.Column<int>(type: "int", nullable: false),
-                    ApplicationSystemId = table.Column<int>(type: "int", nullable: false),
-                    ExtraProperties = table.Column<string>(type: "nvarchar(max)", nullable: false),
-                    ConcurrencyStamp = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: false),
-                    CreationTime = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    CreatorId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    LastModificationTime = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    LastModifierId = table.Column<Guid>(type: "uniqueidentifier", nullable: true)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_SystemIntegrationTransactions", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_SystemIntegrationTransactions_ApplicationSystems_ApplicationSystemId",
-                        column: x => x.ApplicationSystemId,
-                        principalTable: "ApplicationSystems",
-                        principalColumn: "Id");
-                });
-
-            migrationBuilder.CreateTable(
                 name: "IntegrationServices_CustomCosts",
                 columns: table => new
                 {
@@ -468,6 +438,43 @@ namespace Finolyzer.Migrations
                         principalTable: "IntegrationServices",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SystemIntegrationTransactions",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Description = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: false),
+                    Year = table.Column<int>(type: "int", nullable: false),
+                    Month = table.Column<int>(type: "int", nullable: false),
+                    Day = table.Column<int>(type: "int", nullable: false),
+                    TotalCost = table.Column<float>(type: "real", nullable: false),
+                    UsageCount = table.Column<double>(type: "float", nullable: false),
+                    IntegrationServiceId = table.Column<int>(type: "int", nullable: false),
+                    ApplicationSystemId = table.Column<int>(type: "int", nullable: false),
+                    RequestType = table.Column<int>(type: "int", nullable: false),
+                    ExtraProperties = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ConcurrencyStamp = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: false),
+                    CreationTime = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatorId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    LastModificationTime = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    LastModifierId = table.Column<Guid>(type: "uniqueidentifier", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SystemIntegrationTransactions", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_SystemIntegrationTransactions_ApplicationSystems_ApplicationSystemId",
+                        column: x => x.ApplicationSystemId,
+                        principalTable: "ApplicationSystems",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_SystemIntegrationTransactions_IntegrationServices_IntegrationServiceId",
+                        column: x => x.IntegrationServiceId,
+                        principalTable: "IntegrationServices",
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -693,6 +700,11 @@ namespace Finolyzer.Migrations
                 table: "SystemIntegrationTransactions",
                 columns: new[] { "Day", "Month", "Year" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SystemIntegrationTransactions_IntegrationServiceId",
+                table: "SystemIntegrationTransactions",
+                column: "IntegrationServiceId");
         }
 
         /// <inheritdoc />

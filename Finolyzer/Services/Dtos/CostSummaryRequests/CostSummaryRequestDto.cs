@@ -2,9 +2,9 @@
 using Volo.Abp.Application.Dtos;
 using Finolyzer.Entities.Books;
 
-namespace Finolyzer.Services.Dtos.Books;
+namespace Finolyzer.Services.Dtos.CostSummaryRequests;
 
-public class CostSummaryRequestDto : AuditedEntityDto<Guid>
+public class CostSummaryRequestDto : AuditedEntityDto<int>
 {
     public string Name { get; set; }
 

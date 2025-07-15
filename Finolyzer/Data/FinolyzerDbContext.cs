@@ -34,7 +34,7 @@ namespace Finolyzer.Data
 
             // Configure ABP module tables if needed
             // builder.ConfigurePermissionManagement();
-             //builder.ConfigureSettingManagement();
+            //builder.ConfigureSettingManagement();
             // builder.ConfigureBackgroundJobs();
             builder.ConfigureAuditLogging();
 
@@ -189,6 +189,7 @@ namespace Finolyzer.Data
                 b.ToTable(DbTablePrefix + "SystemIntegrationTransactions", DbSchema);
                 b.ConfigureByConvention();
                 b.Property(x => x.Description).IsRequired().HasMaxLength(2000);
+                b.HasOne(x => x.IntegrationService).WithMany().HasForeignKey(x => x.IntegrationServiceId).OnDelete(DeleteBehavior.NoAction);
                 b.HasOne(x => x.ApplicationSystem).WithMany().HasForeignKey(x => x.ApplicationSystemId).OnDelete(DeleteBehavior.NoAction);
 
                 b.HasIndex(x => new { x.Day, x.Month, x.Year }).IsUnique();

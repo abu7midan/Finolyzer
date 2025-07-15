@@ -53,7 +53,7 @@ public class FinolyzerDataSeederContributor
         Server serverLinux = null;
         ProviderSubscription providerSubscription = null;
         Resource resource = null;
-
+        SystemIntegrationTransaction systemIntegrationTransaction = null;
         List<SystemDependency> systemDependencies = new List<SystemDependency>();
         List<IntegrationService> integrationServices = new List<IntegrationService>();
 
@@ -240,6 +240,24 @@ new SystemDependency
 },
 autoSave: true
 ));
+        }
+        var notificationintegration = integrationServices.FirstOrDefault(x => x.Description == "Notification");
+        if (await _systemIntegrationTransactionRepository.GetCountAsync() <= 0)
+        {
+            systemIntegrationTransaction = await _systemIntegrationTransactionRepository.InsertAsync(
+                new SystemIntegrationTransaction
+                {
+                    Description = "abu7midan",
+                    Year = 2025,
+                    Month = 7,
+                    Day = 15,
+                    UsageCount = 15,
+                    IntegrationService= notificationintegration,
+                    ApplicationSystem=applicationSystem,
+                    RequestType=TimlyRequestType.Monthly
+                },
+                autoSave: true
+            );
         }
     }
 }
