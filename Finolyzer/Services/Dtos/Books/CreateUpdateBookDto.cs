@@ -4,7 +4,7 @@ using Finolyzer.Entities.Books;
 
 namespace Finolyzer.Services.Dtos.Books;
 
-public class CreateUpdateCostSummaryRequestDto
+public class CreateUpdateBookDto
 {
     [Required]
     [StringLength(128)]

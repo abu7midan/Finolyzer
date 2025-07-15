@@ -4,7 +4,7 @@ using Finolyzer.Entities.Books;
 
 namespace Finolyzer.Services.Dtos.Books;
 
-public class CostSummaryRequestDto : AuditedEntityDto<Guid>
+public class BookDto : AuditedEntityDto<Guid>
 {
     public string Name { get; set; }
 

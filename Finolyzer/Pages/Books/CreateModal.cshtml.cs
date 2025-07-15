@@ -9,18 +9,18 @@ namespace Finolyzer.Pages.Books
     public class CreateModalModel : AbpPageModel
     {
         [BindProperty]
-        public CreateUpdateCostSummaryRequestDto Book { get; set; }
+        public CreateUpdateBookDto Book { get; set; }
 
-        private readonly ICostSummaryRequestAppService _bookAppService;
+        private readonly IBookAppService _bookAppService;
 
-        public CreateModalModel(ICostSummaryRequestAppService bookAppService)
+        public CreateModalModel(IBookAppService bookAppService)
         {
             _bookAppService = bookAppService;
         }
 
         public void OnGet()
         {
-            Book = new CreateUpdateCostSummaryRequestDto();
+            Book = new CreateUpdateBookDto();
         }
 
         public async Task<IActionResult> OnPostAsync()
