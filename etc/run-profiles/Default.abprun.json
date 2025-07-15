@@ -1,0 +1,14 @@
+﻿{
+  "applications": {
+    "Finolyzer": {
+      "type": "dotnet-project",
+      "launchUrl": "https://localhost:44337",
+      "healthCheckEndpoint": "/health-status",
+      "healthUiEndpoint": "/health-ui",
+      "path": "../../Finolyzer/Finolyzer.csproj",
+      "execution": {
+        "order": 0
+      }
+    }
+  }
+}

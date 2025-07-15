@@ -1,0 +1,46 @@
+{
+  "id": "eeeda86c-04ea-4bcd-b480-c2f3caf9cf80",
+  "template": "app-nolayers",
+  "versions": {
+    "AbpFramework": "9.2.1",
+    "AbpStudio": "1.0.2",
+    "TargetDotnetFramework": "net9.0"
+  },
+  "modules": {
+    "Finolyzer": {
+      "path": "Finolyzer.abpmdl"
+    }
+  },
+  "runProfiles": {
+    "Default": {
+      "path": "etc/run-profiles/Default.abprun.json"
+    }
+  },
+  "options": {
+    "httpRequests": {
+      "ignoredUrls": [
+      
+      ]
+    }
+  },
+  "creatingStudioConfiguration": {
+    "template": "app-nolayers",
+    "createdAbpStudioVersion": "1.0.2",
+    "multiTenancy": "false",
+    "runInstallLibs": "true",
+    "useLocalReferences": "false",
+    "uiFramework": "mvc",
+    "databaseProvider": "ef",
+    "runDbMigrator": "true",
+    "databaseManagementSystem": "sqlserver",
+    "createInitialMigration": "true",
+    "theme": "basic",
+    "themeStyle": "",
+    "themeMenuPlacement": "",
+    "publicWebsite": "",
+    "socialLogin": "false",
+    "selectedLanguages": ["English (United Arab Emirates)", ],
+    "defaultLanguage": "English (United Arab Emirates)",
+    "createCommand": "abp new Finolyzer -t app-nolayers --ui-framework mvc --mobile  --database-provider ef --database-management-system sqlserver --theme basic --no-tests --without-cms-kit --sample-crud-page --dont-run-bundling --no-multi-tenancy --no-social-logins -no-gdpr -no-openiddict-admin-ui -no-audit-logging -no-file-management -no-language-management -no-text-template-management"
+  }
+}
