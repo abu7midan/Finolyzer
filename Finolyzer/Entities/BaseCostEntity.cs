@@ -93,8 +93,8 @@ public class SystemDependency : BaseCostEntity
     public Resource? Resource { get; set; }
     public int? ResourceId { get; set; }
     public virtual float SharePercentage { get; set; }
-    public int Year { get; set; }
-    public int Month { get; set; }
+    public int Year { get; set; } = DateTime.Now.Year;
+    public int Month { get; set; } = DateTime.Now.Month;
 }
 
 public class Resource : BaseCostEntity
@@ -103,15 +103,18 @@ public class Resource : BaseCostEntity
     public string NationalId { get; set; }
 
 }
-public class IntegrationService : BaseCostEntity
+public class IntegrationService : AuditedAggregateRoot<int>
 {
     public string Description { get; set; }
     public string URL { get; set; }
+    public  float UnitCost { get; set; }
+    public virtual ICollection<CostItem>? CustomCosts { get; set; } = new List<CostItem>();
 
     public IntegrationSubscriptionType IntegrationSubscriptionType { get; set; }
 
     public Provider Provider { get; set; }
     public int ProviderId { get; set; }
+    public virtual bool Shared { get; set; }
 
 }
 
@@ -156,10 +159,10 @@ public class ApplicationSystem : BaseCostEntity
     public string Name { get; set; }
 
     // Foreign Key
-    public Portfolio Portfolio { get; set; }
+    public virtual Portfolio Portfolio { get; set; }
     public int PortfolioId { get; set; }
 
-    public ICollection<SystemDependency> SystemDependencies { get; set; }
+    public virtual ICollection<SystemDependency> SystemDependencies { get; set; }
     //public float TotalYearlyCost =>
     //Dependencies?.Sum(d => d.YearlyCost ?? 0) ?? 0
     //+ Servers?.Sum(s => s.YearlyCost ?? 0) ?? 0

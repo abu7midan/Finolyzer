@@ -4,7 +4,11 @@ using System;
 using System.ComponentModel.DataAnnotations;
 
 namespace Finolyzer.Services.Dtos.CostSummaryRequests;
-
+public enum CalculationForType
+{
+    Portfolio=0,
+    System=1
+}
 public class CreateUpdateCostSummaryRequestDto
 {
     [Required]
@@ -12,15 +16,15 @@ public class CreateUpdateCostSummaryRequestDto
     public string Description { get; set; } = string.Empty;
     public string Notes { get; set; } = string.Empty;
 
-    public int PortfolioId { get; set; }
-    
-    public int ApplicationSystemId { get; set; }
     [Required]
-    public TimlyRequestType TimlyRequestType { get; set; } = TimlyRequestType.Monthly;
-
+    public int EntityId { get; set; }
+    [Required]
+    public TimlyRequestType TimlyRequestType { get; set; } 
+    [Required]
+    public CalculationForType CalculationFor { get; set; }
     [Required]
     [DataType(DataType.Date)]
-    public DateTime BeforeDate { get; set; } = DateTime.Now;
+    public DateTime CalculationBeforeDate { get; set; } = DateTime.Now;
 
     
 }

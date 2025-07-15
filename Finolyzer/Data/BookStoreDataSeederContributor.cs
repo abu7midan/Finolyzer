@@ -114,23 +114,12 @@ public class FinolyzerDataSeederContributor
                     Description = "Notification",
                     URL = "https://abp.io/docs",
                     Provider = providermsgat,
-                    YearlyCost = 1000,
+                    UnitCost = 7,
                     Shared = true,
                 },
                 autoSave: true
             ));
-            integrationServices.Add(await _integrationServiceRepository.InsertAsync(
-       new IntegrationService
-       {
-           IntegrationSubscriptionType = IntegrationSubscriptionType.Paid,
-           Description = "Server license",
-           URL = "https://abp.io/docs",
-           Provider = providermicrosoft,
-           YearlyCost = 5000,
-           Shared = true,
-       },
-       autoSave: true
-   ));
+
         }
 
         if (await _serverRepository.GetCountAsync() <= 0)
@@ -196,7 +185,9 @@ public class FinolyzerDataSeederContributor
                                     DependencyType = DependencyType.IntegrationService,
                                     IntegrationService = item,
                                     SharePercentage = (item.Shared ? (100 / 1) : 100),
-                                    YearlyCost = item.YearlyCost / (item.Shared ? (100 / 1) : 100),
+                                    //YearlyCost = item.YearlyCost / (item.Shared ? (100 / 1) : 100),
+                                    Year = 2025,
+                                    Month = 7,
                                 },
                                 autoSave: true
                             ));
@@ -213,6 +204,8 @@ public class FinolyzerDataSeederContributor
                         ProviderSubscription = providerSubscription,
                         SharePercentage = (providerSubscription.Shared ? (100 / 1) : 100),
                         YearlyCost = providerSubscription.YearlyCost / (providerSubscription.Shared ? (100 / 1) : 100),
+                        Year = 2025,
+                        Month = 7,
                     },
                     autoSave: true
                 ));
