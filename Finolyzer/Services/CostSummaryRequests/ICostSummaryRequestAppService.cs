@@ -12,5 +12,5 @@ public interface ICostSummaryRequestAppService :
         PagedAndSortedResultRequestDto, //Used for paging/sorting
         CreateUpdateCostSummaryRequestDto> //Used to create/update a book
 {
-
+    Task<CostSummaryRequestResultDto> CalculateAsync(CreateUpdateCostSummaryRequestDto input);
 }

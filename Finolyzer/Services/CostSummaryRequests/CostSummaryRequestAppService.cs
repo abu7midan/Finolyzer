@@ -75,10 +75,16 @@ public class CostSummaryRequestAppService : ApplicationService, ICostSummaryRequ
             ObjectMapper.Map<List<CostSummaryRequest>, List<CostSummaryRequestDto>>(CostSummaryRequests)
         );
     }
-
-    //[Authorize(FinolyzerPermissions.CostSummaryRequests.Create)]
     public async Task<CostSummaryRequestDto> CreateAsync(CreateUpdateCostSummaryRequestDto input)
     {
+        var CostSummaryRequest = ObjectMapper.Map<CreateUpdateCostSummaryRequestDto, CostSummaryRequest>(input);
+        await _repository.InsertAsync(CostSummaryRequest);
+        return ObjectMapper.Map<CostSummaryRequest, CostSummaryRequestDto>(CostSummaryRequest);
+    }
+    //[Authorize(FinolyzerPermissions.CostSummaryRequests.Create)]
+    public async Task<CostSummaryRequestResultDto> CalculateAsync(CreateUpdateCostSummaryRequestDto input)
+    {
+        CostSummaryRequestResultDto result = new CostSummaryRequestResultDto();
         if (input.CalculationFor == CalculationForType.Portfolio)
         {
             //portfolio = await _portfolioRepository.GetAsync(input.EntityId);
@@ -88,8 +94,14 @@ public class CostSummaryRequestAppService : ApplicationService, ICostSummaryRequ
             ApplicationSystem applicationSystem = await _applicationSystemRepository.GetAsync(input.EntityId, true) ??
               throw new UserFriendlyException(FinolyzerErrorCodes.ApplicationSystemNotExists);
 
+            result.PortfolioName = applicationSystem.Portfolio.Name;
+            result.SystemName = applicationSystem.Name;
+            result.TimlyRequestType = input.TimlyRequestType;
+            result.CalculationBeforeDate = input.CalculationBeforeDate;
+
             if (input.TimlyRequestType == TimlyRequestType.Monthly)
             {
+
                 int currentmonth = input.CalculationBeforeDate.Month;
 
                 foreach (SystemDependency dependency in applicationSystem.SystemDependencies.Where(x => x.Year == input.CalculationBeforeDate.Year && x.Month <= input.CalculationBeforeDate.Month))
@@ -97,18 +109,68 @@ public class CostSummaryRequestAppService : ApplicationService, ICostSummaryRequ
                     if (dependency.DependencyType == DependencyType.Server)
                     {
                         float? serverCost = dependency.Server.Shared ? ((currentmonth * dependency.Server.MonthlyCost) / (dependency.SharePercentage / 100)) : (currentmonth * dependency.Server.MonthlyCost);
+
+                        result.SystemDependencies.Add(new CostSummarySystemDependencytDto()
+                        {
+                            DependencyType = DependencyType.Server,
+                            ServerName = $"{dependency.Server.Provider.Name}-{dependency.Server.Specification}",
+                            ProviderName = $"{dependency.Server.Provider.Name}",
+                            Shared = dependency.Server.Shared ? "Yes" : "No",
+                            SharePercentage = $"{dependency.SharePercentage.ToString()}% ",
+                            TotalCost = Convert.ToDouble(serverCost),
+                            TotalCustomCost = Convert.ToDouble(0),
+                        });
+
                     }
                     else if (dependency.DependencyType == DependencyType.IntegrationService)
                     {
-                        List<SystemIntegrationTransaction> systemIntegrationTransactions = await _systemIntegrationTransactionRepository.GetListAsync(x => x.ApplicationSystemId == applicationSystem.Id && x.IntegrationService.IntegrationSubscriptionType == IntegrationSubscriptionType.Paid && x.Year == input.CalculationBeforeDate.Year && x.Month <= input.CalculationBeforeDate.Month, true);
-                        double? integrationCost = systemIntegrationTransactions?.Sum(x => x.UsageCount * x.IntegrationService.UnitCost) ?? 0;
+                        List<SystemIntegrationTransaction> systemIntegrationTransactions = await _systemIntegrationTransactionRepository
+                            .GetListAsync(x => x.IntegrationServiceId == dependency.IntegrationServiceId
+                            && x.ApplicationSystemId == applicationSystem.Id && x.Year == input.CalculationBeforeDate.Year && x.Month <= input.CalculationBeforeDate.Month, true);
+                        //x.IntegrationService.IntegrationSubscriptionType == IntegrationSubscriptionType.Paid &&
+                        double? integrationCost = systemIntegrationTransactions?.Where(x => x.IntegrationService.IntegrationSubscriptionType == IntegrationSubscriptionType.Paid).Sum(x => x.UsageCount * x.IntegrationService.UnitCost) ?? 0;
+                        double? integrationUsageCount = systemIntegrationTransactions?.Sum(x => x.UsageCount) ?? 0;
+                        result.IntegrationTransactions.Add(new CostSummaryIntegrationTransactionDto()
+                        {
+                            ServiceName = $"{systemIntegrationTransactions.FirstOrDefault().IntegrationService.Provider.Name}-{systemIntegrationTransactions.FirstOrDefault().IntegrationService.Description}",
+                            ProviderName = $"{systemIntegrationTransactions.FirstOrDefault().IntegrationService.Provider.Name}",
+                            Shared = systemIntegrationTransactions.FirstOrDefault().IntegrationService.Shared ? "Yes" : "No",
+                            PaymentType = $"{systemIntegrationTransactions.FirstOrDefault().IntegrationService.IntegrationSubscriptionType.ToString()}% ",
+                            SharePercentage = $"{dependency.SharePercentage.ToString()}% ",
+                            TotalUsageCount = Convert.ToDouble(integrationUsageCount),
+                            TotalCost = Convert.ToDouble(integrationCost),
+                            TotalCustomCost = Convert.ToDouble(0),
+                        });
 
                     }
                     else if (dependency.DependencyType == DependencyType.ProviderSubscription)
                     {
+                        float? serverCost = dependency.ProviderSubscription.Shared ? ((currentmonth * dependency.ProviderSubscription.MonthlyCost) / (dependency.SharePercentage / 100)) : (currentmonth * dependency.ProviderSubscription.MonthlyCost);
+
+                        result.SystemDependencies.Add(new CostSummarySystemDependencytDto()
+                        {
+                            DependencyType = DependencyType.ProviderSubscription,
+                            ProviderSubscriptionName = $"{dependency.ProviderSubscription.Provider.Name}-{dependency.ProviderSubscription.Description}",
+                            ProviderName = $"{dependency.ProviderSubscription.Provider.Name}",
+                            Shared = dependency.ProviderSubscription.Shared ? "Yes" : "No",
+                            SharePercentage = $"{dependency.SharePercentage.ToString()}% ",
+                            TotalCost = Convert.ToDouble(serverCost),
+                            TotalCustomCost = Convert.ToDouble(0),
+                        });
                     }
                     else if (dependency.DependencyType == DependencyType.Resource)
                     {
+                        float? serverCost = dependency.Resource.Shared ? ((currentmonth * dependency.Resource.MonthlyCost) / (dependency.SharePercentage / 100)) : (currentmonth * dependency.Resource.MonthlyCost);
+
+                        result.SystemDependencies.Add(new CostSummarySystemDependencytDto()
+                        {
+                            DependencyType = DependencyType.Resource,
+                            ResourcenName = $"{dependency.Resource.Name}",
+                            Shared = dependency.Resource.Shared ? "Yes" : "No",
+                            SharePercentage = $"{dependency.SharePercentage.ToString()}% ",
+                            TotalCost = Convert.ToDouble(serverCost),
+                            TotalCustomCost = Convert.ToDouble(0),
+                        });
                     }
                 }
                 //var costInfra = applicationSystem.SystemDependencies
@@ -119,11 +181,7 @@ public class CostSummaryRequestAppService : ApplicationService, ICostSummaryRequ
             }
         }
 
-
-
-        var CostSummaryRequest = ObjectMapper.Map<CreateUpdateCostSummaryRequestDto, CostSummaryRequest>(input);
-        await _repository.InsertAsync(CostSummaryRequest);
-        return ObjectMapper.Map<CostSummaryRequest, CostSummaryRequestDto>(CostSummaryRequest);
+        return result;
     }
 
     [Authorize(FinolyzerPermissions.CostSummaryRequests.Edit)]
