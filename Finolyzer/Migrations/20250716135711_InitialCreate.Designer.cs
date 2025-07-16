@@ -13,7 +13,7 @@ using Volo.Abp.EntityFrameworkCore;
 namespace Finolyzer.Migrations
 {
     [DbContext(typeof(FinolyzerDbContext))]
-    [Migration("20250715185103_InitialCreate")]
+    [Migration("20250716135711_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -230,7 +230,7 @@ namespace Finolyzer.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<float?>("YearlyCost")
+                    b.Property<float>("UnitCost")
                         .HasColumnType("real");
 
                     b.HasKey("Id");
@@ -518,6 +518,73 @@ namespace Finolyzer.Migrations
                     b.ToTable("Servers", (string)null);
                 });
 
+            modelBuilder.Entity("Finolyzer.Entities.SharedService", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("ConcurrencyStamp")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)")
+                        .HasColumnName("ConcurrencyStamp");
+
+                    b.Property<DateTime>("CreationTime")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("CreationTime");
+
+                    b.Property<Guid?>("CreatorId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("CreatorId");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(5000)
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ExtraProperties")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("ExtraProperties");
+
+                    b.Property<DateTime?>("LastModificationTime")
+                        .HasColumnType("datetime2")
+                        .HasColumnName("LastModificationTime");
+
+                    b.Property<Guid?>("LastModifierId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("LastModifierId");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ProviderId")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("Shared")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("int");
+
+                    b.Property<float?>("YearlyCost")
+                        .HasColumnType("real");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProviderId");
+
+                    b.ToTable("SharedServices", (string)null);
+                });
+
             modelBuilder.Entity("Finolyzer.Entities.SystemDependency", b =>
                 {
                     b.Property<int>("Id")
@@ -581,6 +648,9 @@ namespace Finolyzer.Migrations
                     b.Property<bool>("Shared")
                         .HasColumnType("bit");
 
+                    b.Property<int>("SharedServiceId")
+                        .HasColumnType("int");
+
                     b.Property<int>("Year")
                         .HasColumnType("int");
 
@@ -598,6 +668,8 @@ namespace Finolyzer.Migrations
                     b.HasIndex("ResourceId");
 
                     b.HasIndex("ServerId");
+
+                    b.HasIndex("SharedServiceId");
 
                     b.HasIndex("Month", "Year");
 
@@ -1212,6 +1284,45 @@ namespace Finolyzer.Migrations
                     b.Navigation("Provider");
                 });
 
+            modelBuilder.Entity("Finolyzer.Entities.SharedService", b =>
+                {
+                    b.HasOne("Finolyzer.Entities.Provider", "Provider")
+                        .WithMany()
+                        .HasForeignKey("ProviderId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.OwnsMany("Finolyzer.Entities.CostItem", "CustomCosts", b1 =>
+                        {
+                            b1.Property<int>("SharedServiceId")
+                                .HasColumnType("int");
+
+                            b1.Property<int>("Id")
+                                .ValueGeneratedOnAdd()
+                                .HasColumnType("int");
+
+                            SqlServerPropertyBuilderExtensions.UseIdentityColumn(b1.Property<int>("Id"));
+
+                            b1.Property<string>("Description")
+                                .IsRequired()
+                                .HasColumnType("nvarchar(max)");
+
+                            b1.Property<float?>("YearlyCost")
+                                .HasColumnType("real");
+
+                            b1.HasKey("SharedServiceId", "Id");
+
+                            b1.ToTable("SharedServices_CustomCosts", (string)null);
+
+                            b1.WithOwner()
+                                .HasForeignKey("SharedServiceId");
+                        });
+
+                    b.Navigation("CustomCosts");
+
+                    b.Navigation("Provider");
+                });
+
             modelBuilder.Entity("Finolyzer.Entities.SystemDependency", b =>
                 {
                     b.HasOne("Finolyzer.Entities.ApplicationSystem", "ApplicationSystem")
@@ -1239,6 +1350,12 @@ namespace Finolyzer.Migrations
                         .WithMany()
                         .HasForeignKey("ServerId")
                         .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Finolyzer.Entities.SharedService", "SharedService")
+                        .WithMany("SystemDependencies")
+                        .HasForeignKey("SharedServiceId")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
 
                     b.OwnsMany("Finolyzer.Entities.CostItem", "CustomCosts", b1 =>
                         {
@@ -1277,6 +1394,8 @@ namespace Finolyzer.Migrations
                     b.Navigation("Resource");
 
                     b.Navigation("Server");
+
+                    b.Navigation("SharedService");
                 });
 
             modelBuilder.Entity("Finolyzer.Entities.SystemIntegrationTransaction", b =>
@@ -1333,6 +1452,11 @@ namespace Finolyzer.Migrations
             modelBuilder.Entity("Finolyzer.Entities.Portfolio", b =>
                 {
                     b.Navigation("ApplicationSystems");
+                });
+
+            modelBuilder.Entity("Finolyzer.Entities.SharedService", b =>
+                {
+                    b.Navigation("SystemDependencies");
                 });
 
             modelBuilder.Entity("Volo.Abp.AuditLogging.AuditLog", b =>

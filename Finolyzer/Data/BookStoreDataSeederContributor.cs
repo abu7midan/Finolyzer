@@ -18,6 +18,7 @@ public class FinolyzerDataSeederContributor
     private readonly IRepository<ProviderSubscription, int> _providerSubscriptionRepository;
     private readonly IRepository<SystemIntegrationTransaction, int> _systemIntegrationTransactionRepository;
     private readonly IRepository<Resource, int> _resourceRepository;
+    private readonly IRepository<SharedService, int> _sharedServiceRepository;
 
     public FinolyzerDataSeederContributor(
         IRepository<Portfolio, int> portfolioRepository,
@@ -28,7 +29,8 @@ public class FinolyzerDataSeederContributor
         IRepository<IntegrationService, int> integrationService,
         IRepository<ProviderSubscription, int> providerSubscription,
         IRepository<SystemIntegrationTransaction, int> systemIntegrationTransaction,
-        IRepository<Resource, int> resource
+        IRepository<Resource, int> resource,
+        IRepository<SharedService, int> sharedServiceRepository
         )
     {
         _portfolioRepository = portfolioRepository;
@@ -40,6 +42,7 @@ public class FinolyzerDataSeederContributor
         _providerSubscriptionRepository = providerSubscription;
         _systemIntegrationTransactionRepository = systemIntegrationTransaction;
         _resourceRepository = resource;
+        _sharedServiceRepository = sharedServiceRepository;
     }
 
     public async Task SeedAsync(DataSeedContext context)
@@ -53,6 +56,7 @@ public class FinolyzerDataSeederContributor
         Server serverLinux = null;
         ProviderSubscription providerSubscription = null;
         Resource resource = null;
+        SharedService sharedService = null;
         SystemIntegrationTransaction systemIntegrationTransaction = null;
         List<SystemDependency> systemDependencies = new List<SystemDependency>();
         List<IntegrationService> integrationServices = new List<IntegrationService>();
@@ -248,6 +252,22 @@ autoSave: true
                     IntegrationService= notificationintegration,
                     ApplicationSystem=applicationSystem,
                     RequestType=TimlyRequestType.Monthly
+                },
+                autoSave: true
+            );
+        }
+
+
+        if (await _sharedServiceRepository.GetCountAsync() <= 0)
+        {
+            sharedService = await _sharedServiceRepository.InsertAsync(
+                new SharedService
+                {
+                    Description = "Office Rental",
+                    Year = 2025,
+                    Month = 7,
+                    YearlyCost = 20000,
+                    Shared = true,
                 },
                 autoSave: true
             );

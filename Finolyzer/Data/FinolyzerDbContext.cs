@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using Volo.Abp.AuditLogging.EntityFrameworkCore;
 using Volo.Abp.EntityFrameworkCore;
 using Volo.Abp.EntityFrameworkCore.Modeling;
-using Volo.Abp.SettingManagement.EntityFrameworkCore;
 
 namespace Finolyzer.Data
 {
@@ -19,7 +18,8 @@ namespace Finolyzer.Data
         public DbSet<ProviderSubscription> ProviderSubscriptions { get; set; }
         public DbSet<Server> Servers { get; set; }
         public DbSet<SystemIntegrationTransaction> SystemIntegrationTransactions { get; set; }
-
+        public DbSet<SharedService> SharedServices { get; set; }
+        
         public const string DbTablePrefix = "";
         public const string DbSchema = null;
 
@@ -102,11 +102,8 @@ namespace Finolyzer.Data
                 b.Property(x => x.Year).IsRequired();
                 b.Property(x => x.Month).IsRequired();
 
-                b.HasOne(x => x.ApplicationSystem)
-                 .WithMany(y => y.SystemDependencies)
-                 .HasForeignKey(x => x.ApplicationSystemId)
-                 .IsRequired()
-                 .OnDelete(DeleteBehavior.NoAction);
+                b.HasOne(x => x.ApplicationSystem).WithMany(y => y.SystemDependencies).HasForeignKey(x => x.ApplicationSystemId).IsRequired().OnDelete(DeleteBehavior.NoAction);
+                b.HasOne(x => x.SharedService).WithMany(y => y.SystemDependencies).HasForeignKey(x => x.SharedServiceId).OnDelete(DeleteBehavior.NoAction);
                 b.HasOne(x => x.Server).WithMany().HasForeignKey(x => x.ServerId).OnDelete(DeleteBehavior.NoAction);
                 b.HasOne(x => x.ProviderSubscription).WithMany().HasForeignKey(x => x.ProviderSubscriptionId).OnDelete(DeleteBehavior.NoAction);
                 b.HasOne(x => x.IntegrationService).WithMany().HasForeignKey(x => x.IntegrationServiceId).OnDelete(DeleteBehavior.NoAction);
@@ -168,6 +165,21 @@ namespace Finolyzer.Data
                 });
             });
 
+            builder.Entity<SharedService>(b =>
+            {
+                b.ToTable(DbTablePrefix + "SharedServices", DbSchema);
+                b.ConfigureByConvention();
+                b.Property(x => x.Description).IsRequired().HasMaxLength(5000);
+                b.HasOne(x => x.Provider).WithMany().HasForeignKey(x => x.ProviderId).OnDelete(DeleteBehavior.NoAction);
+
+                b.OwnsMany(x => x.CustomCosts, y =>
+                {
+                    y.WithOwner().HasForeignKey("SharedServiceId");
+                    y.ToTable(DbTablePrefix + "SharedServices_CustomCosts", DbSchema);
+                    y.HasKey("SharedServiceId", "Id");
+                    y.Property(x => x.Description).IsRequired();
+                });
+            });
             builder.Entity<Server>(b =>
             {
                 b.ToTable(DbTablePrefix + "Servers", DbSchema);

@@ -95,6 +95,9 @@ public class SystemDependency : BaseCostEntity
     public virtual float SharePercentage { get; set; }
     public int Year { get; set; } = DateTime.Now.Year;
     public int Month { get; set; } = DateTime.Now.Month;
+
+    public int SharedServiceId { get; set; }
+    public SharedService SharedService { get; set; } // navigation
 }
 
 public class Resource : BaseCostEntity
@@ -145,7 +148,18 @@ public class ProviderSubscription : BaseCostEntity
 
 }
 
+public class SharedService : BaseCostEntity
+{
+    public string Description { get; set; }
+    public string Name { get; set; }
 
+    public int ProviderId { get; set; }
+    public Provider Provider { get; set; }
+
+    public virtual ICollection<SystemDependency> SystemDependencies { get; set; }
+    public int Year { get; set; } = DateTime.Now.Year;
+    public int Month { get; set; } = DateTime.Now.Month;
+}
 
 public class Server : BaseCostEntity
 {

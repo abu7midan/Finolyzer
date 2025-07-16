@@ -215,16 +215,16 @@ namespace Finolyzer.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     Description = table.Column<string>(type: "nvarchar(max)", maxLength: 5000, nullable: false),
                     URL = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    UnitCost = table.Column<float>(type: "real", nullable: false),
                     IntegrationSubscriptionType = table.Column<int>(type: "int", nullable: false),
                     ProviderId = table.Column<int>(type: "int", nullable: false),
+                    Shared = table.Column<bool>(type: "bit", nullable: false),
                     ExtraProperties = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     ConcurrencyStamp = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: false),
                     CreationTime = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatorId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
                     LastModificationTime = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    LastModifierId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
-                    YearlyCost = table.Column<float>(type: "real", nullable: true),
-                    Shared = table.Column<bool>(type: "bit", nullable: false)
+                    LastModifierId = table.Column<Guid>(type: "uniqueidentifier", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -307,6 +307,36 @@ namespace Finolyzer.Migrations
                     table.PrimaryKey("PK_Servers", x => x.Id);
                     table.ForeignKey(
                         name: "FK_Servers_Providers_ProviderId",
+                        column: x => x.ProviderId,
+                        principalTable: "Providers",
+                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SharedServices",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Description = table.Column<string>(type: "nvarchar(max)", maxLength: 5000, nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ProviderId = table.Column<int>(type: "int", nullable: false),
+                    Year = table.Column<int>(type: "int", nullable: false),
+                    Month = table.Column<int>(type: "int", nullable: false),
+                    ExtraProperties = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    ConcurrencyStamp = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: false),
+                    CreationTime = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatorId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    LastModificationTime = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    LastModifierId = table.Column<Guid>(type: "uniqueidentifier", nullable: true),
+                    YearlyCost = table.Column<float>(type: "real", nullable: true),
+                    Shared = table.Column<bool>(type: "bit", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SharedServices", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_SharedServices_Providers_ProviderId",
                         column: x => x.ProviderId,
                         principalTable: "Providers",
                         principalColumn: "Id");
@@ -520,6 +550,27 @@ namespace Finolyzer.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "SharedServices_CustomCosts",
+                columns: table => new
+                {
+                    SharedServiceId = table.Column<int>(type: "int", nullable: false),
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    YearlyCost = table.Column<float>(type: "real", nullable: true),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SharedServices_CustomCosts", x => new { x.SharedServiceId, x.Id });
+                    table.ForeignKey(
+                        name: "FK_SharedServices_CustomCosts_SharedServices_SharedServiceId",
+                        column: x => x.SharedServiceId,
+                        principalTable: "SharedServices",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "SystemDependencies",
                 columns: table => new
                 {
@@ -534,6 +585,7 @@ namespace Finolyzer.Migrations
                     SharePercentage = table.Column<float>(type: "real", nullable: false),
                     Year = table.Column<int>(type: "int", nullable: false),
                     Month = table.Column<int>(type: "int", nullable: false),
+                    SharedServiceId = table.Column<int>(type: "int", nullable: false),
                     ExtraProperties = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     ConcurrencyStamp = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: false),
                     CreationTime = table.Column<DateTime>(type: "datetime2", nullable: false),
@@ -570,6 +622,11 @@ namespace Finolyzer.Migrations
                         name: "FK_SystemDependencies_Servers_ServerId",
                         column: x => x.ServerId,
                         principalTable: "Servers",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_SystemDependencies_SharedServices_SharedServiceId",
+                        column: x => x.SharedServiceId,
+                        principalTable: "SharedServices",
                         principalColumn: "Id");
                 });
 
@@ -661,6 +718,11 @@ namespace Finolyzer.Migrations
                 column: "ProviderId");
 
             migrationBuilder.CreateIndex(
+                name: "IX_SharedServices_ProviderId",
+                table: "SharedServices",
+                column: "ProviderId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_SystemDependencies_ApplicationSystemId",
                 table: "SystemDependencies",
                 column: "ApplicationSystemId");
@@ -689,6 +751,11 @@ namespace Finolyzer.Migrations
                 name: "IX_SystemDependencies_ServerId",
                 table: "SystemDependencies",
                 column: "ServerId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_SystemDependencies_SharedServiceId",
+                table: "SystemDependencies",
+                column: "SharedServiceId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_SystemIntegrationTransactions_ApplicationSystemId",
@@ -741,6 +808,9 @@ namespace Finolyzer.Migrations
                 name: "Servers_CustomCosts");
 
             migrationBuilder.DropTable(
+                name: "SharedServices_CustomCosts");
+
+            migrationBuilder.DropTable(
                 name: "SystemDependencies_CustomCosts");
 
             migrationBuilder.DropTable(
@@ -769,6 +839,9 @@ namespace Finolyzer.Migrations
 
             migrationBuilder.DropTable(
                 name: "Servers");
+
+            migrationBuilder.DropTable(
+                name: "SharedServices");
 
             migrationBuilder.DropTable(
                 name: "Portfolios");
