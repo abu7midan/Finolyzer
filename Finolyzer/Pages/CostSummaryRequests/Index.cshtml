@@ -1,0 +1,31 @@
+﻿@page
+@using Finolyzer.Localization
+@using Finolyzer.Permissions
+@using Finolyzer.Pages.CostSummaryRequests
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.Extensions.Localization
+@model IndexModel
+@inject IStringLocalizer<FinolyzerResource> L
+@inject IAuthorizationService AuthorizationService
+@section scripts
+{
+    <abp-script src="/Pages/CostSummaryRequests/Index.js" />
+}
+<abp-card>
+    <abp-card-header>
+        <abp-row>
+            <abp-column size-md="_6">
+                <abp-card-title>@L["CostSummaryRequests"]</abp-card-title>
+            </abp-column>
+            <abp-column size-md="_6" class="text-end">
+                <abp-button id="NewCostSummaryRequestButton"
+                            text="@L["NewSummaryRequest"].Value"
+                                icon="plus"
+                                button-type="Primary"/>
+             </abp-column>
+        </abp-row>
+    </abp-card-header>
+    <abp-card-body>
+        <abp-table striped-rows="true" id="CostSummaryRequestsTable"></abp-table>
+    </abp-card-body>
+</abp-card>

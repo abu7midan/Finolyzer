@@ -34,6 +34,25 @@
     "Permission:Books.Create": "Creating new books",
     "Permission:Books.Edit": "Editing the books",
     "Permission:Books.Delete": "Deleting the books",
-    "Menu:Home": "Home"
+    "Menu:Home": "Home",
+    "Menu:CostCalc": "Application Cost Calculator",
+    "CostSummaryRequests": "Cost Summary Requests",
+    "NewSummaryRequest": "New System Cost Calculator Request",
+    "Description": "Description",
+    "Notes": "Notes",
+    "CalculationFor": "Calculation For",
+    "TimlyRequestType": "Time Type",
+    "CalculationBeforeDate": "Calculation Date",
+    "IncludeSharedService": "Include Shared Services",
+    "Yes": "Yes",
+    "No": "No",
+    "Enum:CalculationForType.Portfolio": "Portfolio",
+    "Enum:CalculationForType.System": "System",
+    "Enum:TimlyRequestType.Daily": "Daily",
+    "Enum:TimlyRequestType.Monthly": "Monthly",
+    "Enum:TimlyRequestType.Quarter": "Quarter",
+    "Enum:TimlyRequestType.Yearly": "Yearly",
+    "CostSummaryRequestDeletionConfirmationMessage": "Are you sure you want to delete Cost Summary '{0}'?",
+    "NewCostSummaryRequest": "New Cost Summary Request"
   }
 }

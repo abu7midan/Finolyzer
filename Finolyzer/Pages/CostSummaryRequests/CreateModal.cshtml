@@ -1,0 +1,31 @@
+﻿@page
+@using Finolyzer.Localization
+@using Finolyzer.Entities
+@using Finolyzer.Pages.CostSummaryRequests
+@using Microsoft.Extensions.Localization
+@using Volo.Abp.AspNetCore.Mvc.UI.Bootstrap.TagHelpers.Modal
+@model CreateModalModel
+@inject IStringLocalizer<FinolyzerResource> L
+@{
+    Layout = null;
+}
+<form method="post" asp-page-handler="OnPostAsync">
+
+    <abp-modal>
+        <abp-modal-header title="@L["NewCostSummaryRequest"].Value"></abp-modal-header>
+        <abp-modal-body>
+            <abp-input asp-for="CostSummaryRequest.Description" />
+            <abp-input asp-for="CostSummaryRequest.Notes" />
+            <abp-input asp-for="CostSummaryRequest.CalculationBeforeDate" type="date" />
+            <abp-select asp-for="CostSummaryRequest.CalculationFor" item-type="Finolyzer.Enums.CalculationForType" />
+            <div id="entity-dropdown-container">
+                <abp-select asp-for="CostSummaryRequest.EntityId" label="Application" asp-items="Model.ApplicationSystems"></abp-select>
+
+            </div>
+
+            <abp-select asp-for="CostSummaryRequest.TimlyRequestType" item-type="Finolyzer.Entities.TimlyRequestType" />
+            <abp-input asp-for="CostSummaryRequest.IncludeSharedService" />
+        </abp-modal-body>
+        <abp-modal-footer buttons="@(AbpModalButtons.Cancel|AbpModalButtons.Save)"></abp-modal-footer>
+    </abp-modal>
+</form>

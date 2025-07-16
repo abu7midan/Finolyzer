@@ -23,15 +23,12 @@ public class FinolyzerMenuContributor : IMenuContributor
         var l = context.GetLocalizer<FinolyzerResource>();
         context.Menu.Items.Insert(
             0,
-            new ApplicationMenuItem(
-                FinolyzerMenus.Home,
-                l["Menu:Home"],
-                "~/",
-                icon: "fas fa-home",
-                order: 0
-            )
+            new ApplicationMenuItem(FinolyzerMenus.Home,l["Menu:Home"],"~/",icon: "fas fa-home",order: 0)
         );
-
+        context.Menu.Items.Insert(
+      1,
+      new ApplicationMenuItem(FinolyzerMenus.Home, l["Menu:CostCalc"], "~/CostSummaryRequests", icon: "fa fa-money", order: 0)
+  );
 
         //Administration
         var administration = context.Menu.GetAdministration();
@@ -47,14 +44,8 @@ public class FinolyzerMenuContributor : IMenuContributor
                 "BooksStore",
                 l["Menu:Finolyzer"],
                 icon: "fa fa-book"
-            ).AddItem(
-                new ApplicationMenuItem(
-                    "BooksStore.Books",
-                    l["Menu:Books"],
-                    url: "/Books"
-                ).RequirePermissions(FinolyzerPermissions.Books.Default) 
-            )
-        );
+            ).AddItem(new ApplicationMenuItem("BooksStore.Books",l["Menu:Books"],url: "/Books").RequirePermissions(FinolyzerPermissions.Books.Default))
+            );
         
         return Task.CompletedTask;
     }

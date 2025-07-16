@@ -67,7 +67,7 @@ public class CostSummaryRequestAppService : ApplicationService, ICostSummaryRequ
     {
         var queryable = await _repository.GetQueryableAsync();
         var query = queryable
-            .OrderBy(input.Sorting.IsNullOrWhiteSpace() ? "Name" : input.Sorting)
+            .OrderBy(input.Sorting.IsNullOrWhiteSpace() ? "CreationTime" : input.Sorting)
             .Skip(input.SkipCount)
             .Take(input.MaxResultCount);
 
