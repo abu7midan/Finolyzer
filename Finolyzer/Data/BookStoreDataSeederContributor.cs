@@ -52,6 +52,7 @@ public class FinolyzerDataSeederContributor
         Provider providermicrosoft = null;
         Provider providergoogle = null;
         Provider providermsgat = null;
+        Provider providerolyan = null;
         Server serverWindows = null;
         Server serverLinux = null;
         ProviderSubscription providerSubscription = null;
@@ -87,9 +88,16 @@ public class FinolyzerDataSeederContributor
         if (await _providerRepository.GetCountAsync() <= 0)
         {
             providermicrosoft = await _providerRepository.InsertAsync(
+     new Provider
+     {
+         Name = "microsoft",
+     },
+     autoSave: true
+ );
+            providerolyan = await _providerRepository.InsertAsync(
                 new Provider
                 {
-                    Name = "microsoft",
+                    Name = "Olyan Realstate",
                 },
                 autoSave: true
             );
@@ -263,11 +271,14 @@ autoSave: true
             sharedService = await _sharedServiceRepository.InsertAsync(
                 new SharedService
                 {
+                    Name = "Office Rental",
                     Description = "Office Rental",
                     Year = 2025,
                     Month = 7,
+                    Provider = providerolyan,
                     YearlyCost = 20000,
-                    Shared = true,
+                    Shared = true
+
                 },
                 autoSave: true
             );

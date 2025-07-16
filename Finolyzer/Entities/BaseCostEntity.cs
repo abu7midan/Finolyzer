@@ -96,8 +96,8 @@ public class SystemDependency : BaseCostEntity
     public int Year { get; set; } = DateTime.Now.Year;
     public int Month { get; set; } = DateTime.Now.Month;
 
-    public int SharedServiceId { get; set; }
-    public SharedService SharedService { get; set; } // navigation
+    public int? SharedServiceId { get; set; }
+    public SharedService? SharedService { get; set; } // navigation
 }
 
 public class Resource : BaseCostEntity
@@ -156,7 +156,7 @@ public class SharedService : BaseCostEntity
     public int ProviderId { get; set; }
     public Provider Provider { get; set; }
 
-    public virtual ICollection<SystemDependency> SystemDependencies { get; set; }
+    public  ICollection<SystemDependency> SystemDependencies { get; set; }
     public int Year { get; set; } = DateTime.Now.Year;
     public int Month { get; set; } = DateTime.Now.Month;
 }

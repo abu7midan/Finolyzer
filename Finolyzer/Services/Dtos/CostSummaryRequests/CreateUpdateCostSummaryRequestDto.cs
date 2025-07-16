@@ -25,6 +25,6 @@ public class CreateUpdateCostSummaryRequestDto
     [Required]
     [DataType(DataType.Date)]
     public DateTime CalculationBeforeDate { get; set; } = DateTime.Now;
+    public bool IncludeSharedService { get; set; } = true;
 
-    
 }

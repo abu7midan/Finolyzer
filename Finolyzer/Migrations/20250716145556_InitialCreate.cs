@@ -585,7 +585,7 @@ namespace Finolyzer.Migrations
                     SharePercentage = table.Column<float>(type: "real", nullable: false),
                     Year = table.Column<int>(type: "int", nullable: false),
                     Month = table.Column<int>(type: "int", nullable: false),
-                    SharedServiceId = table.Column<int>(type: "int", nullable: false),
+                    SharedServiceId = table.Column<int>(type: "int", nullable: true),
                     ExtraProperties = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     ConcurrencyStamp = table.Column<string>(type: "nvarchar(40)", maxLength: 40, nullable: false),
                     CreationTime = table.Column<DateTime>(type: "datetime2", nullable: false),

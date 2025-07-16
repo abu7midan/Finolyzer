@@ -350,11 +350,23 @@ public class FinolyzerModule : AbpModule
             options.Entity<ApplicationSystem>(options =>
             {
                 options.DefaultWithDetailsFunc = query => query
+                .Include(o => o.Portfolio)
                 .Include(o => o.SystemDependencies).ThenInclude(x => x.IntegrationService).ThenInclude(x => x.Provider)
                 .Include(x => x.SystemDependencies).ThenInclude(x => x.ProviderSubscription).ThenInclude(x => x.Provider)
                 .Include(x => x.SystemDependencies).ThenInclude(x => x.Server).ThenInclude(x => x.Provider)
                 .Include(x => x.SystemDependencies).ThenInclude(x => x.Resource);
             });
+
+            options.Entity<SharedService>(options =>
+            {
+                options.DefaultWithDetailsFunc = query => query
+                .Include(o => o.Provider)
+                .Include(o => o.SystemDependencies).ThenInclude(x => x.IntegrationService).ThenInclude(x => x.Provider)
+                .Include(x => x.SystemDependencies).ThenInclude(x => x.ProviderSubscription).ThenInclude(x => x.Provider)
+                .Include(x => x.SystemDependencies).ThenInclude(x => x.Server).ThenInclude(x => x.Provider)
+                .Include(x => x.SystemDependencies).ThenInclude(x => x.Resource);
+            });
+            
         });
     }
 

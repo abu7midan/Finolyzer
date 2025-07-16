@@ -645,7 +645,7 @@ namespace Finolyzer.Migrations
                     b.Property<bool>("Shared")
                         .HasColumnType("bit");
 
-                    b.Property<int>("SharedServiceId")
+                    b.Property<int?>("SharedServiceId")
                         .HasColumnType("int");
 
                     b.Property<int>("Year")
@@ -1351,8 +1351,7 @@ namespace Finolyzer.Migrations
                     b.HasOne("Finolyzer.Entities.SharedService", "SharedService")
                         .WithMany("SystemDependencies")
                         .HasForeignKey("SharedServiceId")
-                        .OnDelete(DeleteBehavior.NoAction)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.OwnsMany("Finolyzer.Entities.CostItem", "CustomCosts", b1 =>
                         {

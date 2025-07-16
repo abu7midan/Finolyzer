@@ -103,7 +103,7 @@ namespace Finolyzer.Data
                 b.Property(x => x.Month).IsRequired();
 
                 b.HasOne(x => x.ApplicationSystem).WithMany(y => y.SystemDependencies).HasForeignKey(x => x.ApplicationSystemId).IsRequired().OnDelete(DeleteBehavior.NoAction);
-                b.HasOne(x => x.SharedService).WithMany(y => y.SystemDependencies).HasForeignKey(x => x.SharedServiceId).OnDelete(DeleteBehavior.NoAction);
+               b.HasOne(x => x.SharedService).WithMany(y => y.SystemDependencies).HasForeignKey(x => x.SharedServiceId).IsRequired(false).OnDelete(DeleteBehavior.NoAction);
                 b.HasOne(x => x.Server).WithMany().HasForeignKey(x => x.ServerId).OnDelete(DeleteBehavior.NoAction);
                 b.HasOne(x => x.ProviderSubscription).WithMany().HasForeignKey(x => x.ProviderSubscriptionId).OnDelete(DeleteBehavior.NoAction);
                 b.HasOne(x => x.IntegrationService).WithMany().HasForeignKey(x => x.IntegrationServiceId).OnDelete(DeleteBehavior.NoAction);
@@ -171,6 +171,7 @@ namespace Finolyzer.Data
                 b.ConfigureByConvention();
                 b.Property(x => x.Description).IsRequired().HasMaxLength(5000);
                 b.HasOne(x => x.Provider).WithMany().HasForeignKey(x => x.ProviderId).OnDelete(DeleteBehavior.NoAction);
+                //b.HasMany(x => x.SystemDependencies).WithOne(x=>x.SharedService).HasForeignKey(x => x.SharedServiceId).OnDelete(DeleteBehavior.NoAction);
 
                 b.OwnsMany(x => x.CustomCosts, y =>
                 {
