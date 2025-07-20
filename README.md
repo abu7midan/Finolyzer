@@ -1,80 +1,90 @@
-# Finolyzer
+FinOps for Non-Cloud IT Systems — Introducing Finolyzer
 
-## About this solution
+Introduction
+In today's world, much attention is given to cloud-native cost optimization.
+But what about the organizations still running core systems outside the cloud? On premises or hybrid ?
+Non-cloud infrastructure — like servers, integrations, on-prem services, and shared resources — represents a major chunk of IT spend , often unmanaged and invisible.
+These costs are real , recurring, and significant… yet not tracked same like billing module inside google or Microsoft .
+In this blog post, I will explain real case about FinOps for non-cloud environments.
+And this is exactly what Finolyzer was built for.
+What is FinOps?
+FinOps is a framework that brings together finance, engineering, and operations to manage the economic lifecycle of IT systems.
+While traditionally focused on the cloud, FinOps actually applies to any IT stack , including:
+•	servers 
+•	Shared networks, infra, licensing 
+•	API-based integrations 
+•	Support staff & resource allocation
+At its core, FinOps is about making clear:
+What is each system costing us to run , and is it worth the value?
+Some time operation cost is more costly than building system.
+Introduction to Finolyzer
+ 
 
-This is a minimalist, non-layered startup solution with the ABP Framework. All the fundamental ABP modules are already installed.
+Finolyzer is a FinOps platform that helps IT leaders & finance teams manage the true cost of applications, servers, APIs, and human resources. With system-level granularity, you can visualize dependencies, identify high-cost areas, calculate shared service expenses, and track usage-based integrations—all in real time.
+Finolyzer is a modern, open-source FinOps platform designed specifically for non-cloud IT systems , including:
+•	On-premise systems
+•	Shared service environments 
+•	infrastructure (servers + cloud)
+•	internal integrations
+•	Etc.
+It offers a powerful way to:
+•	Track actual and projected operational spend
+•	Allocate shared costs across systems
+•	Calculate cost-per-portfolio or system or provider component down to daily/monthly/yearly
+•	Visualize cost flows via dashboards and reports 
+•	Add budget and alert and error budget.
+•	Easy to integrate with any system 
+•	Api based 
+•	Able to customize 
+•	
+System Architecture
+Key Entities
+•	Portfolio
+A group of application systems (e.g. HR apps)
+•	ApplicationSystem
+A single system to be cost-tracked
+•	SystemDependency
+Servers, Integrations, Resources, etc. tied to the system
+•	SharedService
+Shared components (e.g. internet, rent, backup)
+•	IntegrationService
+Trackable API/service with cost-per-call
+•	Resource
+Human operational cost (support, admin, ops)
+•	CostSummaryRequest
+Output: cost breakdown per quarter/month/year
 
-### Pre-requirements
 
-* [.NET9.0+ SDK](https://dotnet.microsoft.com/download/dotnet)
-* [Node v18 or 20](https://nodejs.org/en)
+Architecture 
+ 
+ER diagram 
+ 
+System UI
+ 
 
-## Before running the application
+Example Result: System Summary
+ 
 
-### Generating a Signing Certificate
+Conclusion
+FinOps is not just for the cloud.
+Finolyzer brings financial clarity to the massive part of IT that runs on-prem, physically, internally — or simply, not in the cloud .
+By giving you visibility, control, and reporting tools, Finolyzer helps you:
+•	Improve accountability
+•	Plan budgets with data
+•	Answer: “What is this system actually costing us?”
+And the best part?
+It's open source, and now available to the public. 
+Copyright & Open Source
+© 2025 Finolyzer by Mohammad Abu Humaidan— All rights reserved.
+This project is MIT Licensed , available and free on GitHub .
+ GitHub : https://github.com/abu7midan/finolyzer
+Final Words
+I hope Finolyzer helps you see the complete picture of your IT budget — especially the half that isn’t covered by cloud dashboards.
+If you found this blog valuable and want to join the journey:
+Star the GitHub repo
+Share with your team
+Send me thoughts or feature suggestions
+Thanks for reading — and welcome to the future of FinOps:
+beyond the cloud . 
 
-In the production environment, you need to use a production signing certificate. ABP Framework sets up signing and encryption certificates in your application and expects an `openiddict.pfx` file in your application.
 
-This certificate is already generated when you created the solution, so most of the time you don't need to generate it yourself. However, if you need to generate a certificate, you can use the following command:
-
-```bash
-dotnet dev-certs https -v -ep openiddict.pfx -p 3dcd90be-12c4-4cf3-a0f5-26e565358f66
-```
-
-> `3dcd90be-12c4-4cf3-a0f5-26e565358f66` is the password of the certificate, you can change it to any password you want.
-
-It is recommended to use **two** RSA certificates, distinct from the certificate(s) used for HTTPS: one for encryption, one for signing.
-
-For more information, please refer to: [OpenIddict Certificate Configuration](https://documentation.openiddict.com/configuration/encryption-and-signing-credentials.html#registering-a-certificate-recommended-for-production-ready-scenarios)
-
-> Also, see the [Configuring OpenIddict](https://abp.io/docs/latest/Deployment/Configuring-OpenIddict#production-environment) documentation for more information.
-
-### Install Client-Side libraries
-
-Run the following command in your solution directory. This step is automatically done when you create a new solution, if you didn't especially disabled it. However, you should run it yourself if you have first cloned this solution from your source control, or added a new client-side package dependency to your solution.
-
-```bash
-abp install-libs
-```
-
-> This command installs all NPM packages for MVC/Razor Pages and Blazor Server UIs and this command is already run by the ABP CLI, so most of the time you don't need to run this command manually.
-
-## How to run
-
-The application needs a database. Run the following command in the [Finolyzer](./Finolyzer) project directory to migrate the database and seed the initial data. This step is automatically done when you create a new solution, if you didn't especially disable it.
-
-````bash
-dotnet run --migrate-database
-````
-
-This command will create and seed the initial database. Then you can run the application with any IDE that supports .NET.
-
-Happy coding..!
-
-## Deploying the application
-
-Deploying an ABP application follows the same process as deploying any .NET or ASP.NET Core application. However, there are important considerations to keep in mind. For detailed guidance, refer to ABP's [deployment documentation](https://abp.io/docs/latest/Deployment/Index).
-
-### How to deploy on Docker
-
-The application provides the related `Dockerfiles` and `docker-compose` file with scripts. You can build the docker images and run them using docker-compose. The necessary database, DbMigrator, and the application will be running on docker with health checks in an isolated docker network.
-
-#### Creating the Docker images
-
-Navigate to [etc/build](./etc/build) folder and run the `build-images-locally.ps1` script. You can examine the script to set **image tag** for your images. It is `latest` by default.
-
-#### Running the Docker images using Docker-Compose
-
-Navigate to [etc/docker](./etc/docker) folder and run the `run-docker.ps1` script. The script will generate developer certificates (if it doesn't exist already) with `dotnet dev-certs` command to use HTTPS. Then, the script runs the provided docker-compose file on detached mode.
-
-> Not: Developer certificate is only valid for **localhost** domain. If you want to deploy to a real DNS in a production environment, use LetsEncrypt or similar tools.
-
-#### Stopping the Docker containers
-
-Navigate to [etc/docker](./etc/docker) folder and run the `stop-docker.ps1` script. The script stops and removes the running containers.
-
-### Additional resources
-
-You can see the following resources to learn more about your solution and the ABP Framework:
-
-* [Application (Single Layer) Startup Template](https://abp.io/docs/latest/startup-templates/application-single-layer/index)
