@@ -4,6 +4,7 @@ using Finolyzer.HealthChecks;
 using Finolyzer.Localization;
 using Finolyzer.Menus;
 using Finolyzer.Permissions;
+using Finolyzer.Services.CostSummaryRequests;
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -74,7 +75,7 @@ namespace Finolyzer;
 
     // lepton-theme
     typeof(AbpAspNetCoreMvcUiBasicThemeModule),
-
+     
     //// Account module packages
     //typeof(AbpAccountWebOpenIddictModule),
     //typeof(AbpAccountHttpApiModule),
@@ -167,7 +168,7 @@ public class FinolyzerModule : AbpModule
         {
             context.Services.Replace(ServiceDescriptor.Singleton<IEmailSender, NullEmailSender>());
         }
-
+        ConfigureMCPServer(context);
         //ConfigureAuthentication(context);
         //ConfigureMultiTenancy();
         ConfigureUrls(configuration);
@@ -180,7 +181,7 @@ public class FinolyzerModule : AbpModule
         ConfigureLocalization();
         ConfigureNavigationServices();
         ConfigureEfCore(context);
-        
+
         Configure<RazorPagesOptions>(options =>
         {
             options.Conventions.AuthorizePage("/Books/Index", FinolyzerPermissions.Books.Default);
@@ -188,7 +189,13 @@ public class FinolyzerModule : AbpModule
             options.Conventions.AuthorizePage("/Books/EditModal", FinolyzerPermissions.Books.Edit);
         });
     }
-
+    private void ConfigureMCPServer(ServiceConfigurationContext context)
+    {
+        context.Services.AddMcpServer()
+            .WithStdioServerTransport()
+            .WithToolsFromAssembly(typeof(CostSummaryRequestAppServiceTools).Assembly);
+        context.Services.AddTransient<CostSummaryRequestAppServiceTools>();
+    }
     private void ConfigureHealthChecks(ServiceConfigurationContext context)
     {
         context.Services.AddFinolyzerHealthChecks();
@@ -251,8 +258,8 @@ public class FinolyzerModule : AbpModule
                 .AddVirtualJson("/Localization/Finolyzer");
 
             options.DefaultResourceType = typeof(FinolyzerResource);
-            
-            options.Languages.Add(new LanguageInfo("en-AE", "en-AE", "English (United Arab Emirates)")); 
+
+            options.Languages.Add(new LanguageInfo("en-AE", "en-AE", "English (United Arab Emirates)"));
 
         });
 
@@ -321,7 +328,7 @@ public class FinolyzerModule : AbpModule
             options.Contributors.Add(new FinolyzerToolbarContributor());
         });
     }
-    
+
     private void ConfigureEfCore(ServiceConfigurationContext context)
     {
         context.Services.AddAbpDbContext<FinolyzerDbContext>(options =>
@@ -366,7 +373,7 @@ public class FinolyzerModule : AbpModule
                 .Include(x => x.SystemDependencies).ThenInclude(x => x.Server).ThenInclude(x => x.Provider)
                 .Include(x => x.SystemDependencies).ThenInclude(x => x.Resource);
             });
-            
+
         });
     }
 
