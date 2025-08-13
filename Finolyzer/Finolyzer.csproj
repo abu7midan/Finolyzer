@@ -122,9 +122,5 @@
     <Content Remove="$(UserProfile)\.nuget\packages\*\*\contentFiles\any\*\*.abppkg*" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Compile Include="Data\seedscripts.sql" />
-    <Compile Include="Data\seed.sql" />
-  </ItemGroup>
 
 </Project>

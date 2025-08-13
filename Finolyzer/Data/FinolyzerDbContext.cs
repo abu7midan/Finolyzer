@@ -19,7 +19,7 @@ namespace Finolyzer.Data
         public DbSet<Server> Servers { get; set; }
         public DbSet<SystemIntegrationTransaction> SystemIntegrationTransactions { get; set; }
         public DbSet<SharedService> SharedServices { get; set; }
-        
+
         public const string DbTablePrefix = "";
         public const string DbSchema = null;
 
@@ -66,12 +66,24 @@ namespace Finolyzer.Data
                     y.Property(x => x.Description).IsRequired();
                 });
             });
-            builder.Entity<ApplicatioIntegrationKey>(b =>
+            builder.Entity<ApplicationIntegrationKey>(b =>
             {
-                b.ToTable(DbTablePrefix + "ApplicatioIntegrationKeys", DbSchema);
+                b.ToTable(DbTablePrefix + "ApplicationIntegrationKeys", DbSchema);
                 b.ConfigureByConvention();
-                b.HasOne(x => x.ApplicationSystem).WithMany().HasForeignKey(x => x.ApplicationSystemId).OnDelete(DeleteBehavior.NoAction);
-                b.HasOne(x => x.IntegrationService).WithMany().HasForeignKey(x => x.IntegrationServiceId).OnDelete(DeleteBehavior.NoAction);
+                b.Property(x => x.Description).IsRequired();
+                b.Property(x => x.UserName).IsRequired();
+                b.Property(x => x.Password).IsRequired();
+                b.Property(x => x.ConcurrencyStamp).IsRequired().HasMaxLength(40);
+
+                b.HasOne(x => x.ApplicationSystem)
+                    .WithMany()
+                    .HasForeignKey(x => x.ApplicationSystemId)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                b.HasOne(x => x.IntegrationService)
+                    .WithMany()
+                    .HasForeignKey(x => x.IntegrationServiceId)
+                    .OnDelete(DeleteBehavior.NoAction);
             });
             builder.Entity<Resource>(b =>
             {
@@ -109,7 +121,7 @@ namespace Finolyzer.Data
                 b.Property(x => x.Month).IsRequired();
 
                 b.HasOne(x => x.ApplicationSystem).WithMany(y => y.SystemDependencies).HasForeignKey(x => x.ApplicationSystemId).IsRequired().OnDelete(DeleteBehavior.NoAction);
-               b.HasOne(x => x.SharedService).WithMany(y => y.SystemDependencies).HasForeignKey(x => x.SharedServiceId).IsRequired(false).OnDelete(DeleteBehavior.NoAction);
+                b.HasOne(x => x.SharedService).WithMany(y => y.SystemDependencies).HasForeignKey(x => x.SharedServiceId).IsRequired(false).OnDelete(DeleteBehavior.NoAction);
                 b.HasOne(x => x.Server).WithMany().HasForeignKey(x => x.ServerId).OnDelete(DeleteBehavior.NoAction);
                 b.HasOne(x => x.ProviderSubscription).WithMany().HasForeignKey(x => x.ProviderSubscriptionId).OnDelete(DeleteBehavior.NoAction);
                 b.HasOne(x => x.IntegrationService).WithMany().HasForeignKey(x => x.IntegrationServiceId).OnDelete(DeleteBehavior.NoAction);
@@ -208,11 +220,24 @@ namespace Finolyzer.Data
                 b.ToTable(DbTablePrefix + "SystemIntegrationTransactions", DbSchema);
                 b.ConfigureByConvention();
                 b.Property(x => x.Description).IsRequired().HasMaxLength(2000);
-                b.HasOne(x => x.IntegrationService).WithMany().HasForeignKey(x => x.IntegrationServiceId).OnDelete(DeleteBehavior.NoAction);
-                b.HasOne(x => x.ApplicatioIntegrationKey).WithMany().HasForeignKey(x => x.ApplicatioIntegrationKeyId).OnDelete(DeleteBehavior.NoAction);
-                b.HasOne(x => x.ApplicationSystem).WithMany().HasForeignKey(x => x.ApplicationSystemId).OnDelete(DeleteBehavior.NoAction);
 
-                b.HasIndex(x => new { x.Day, x.Month, x.Year }).IsUnique();
+                b.HasOne(x => x.IntegrationService)
+                    .WithMany()
+                    .HasForeignKey(x => x.IntegrationServiceId)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                b.HasOne(x => x.ApplicationSystem)
+                    .WithMany()
+                    .HasForeignKey(x => x.ApplicationSystemId)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                b.HasOne(x => x.ApplicationIntegrationKey)
+                    .WithMany()
+                    .HasForeignKey(x => x.ApplicationIntegrationKeyId)
+                    .OnDelete(DeleteBehavior.NoAction);
+
+                b.HasIndex(x => new { x.Day, x.Month, x.Year })
+                    .IsUnique();
             });
         }
     }

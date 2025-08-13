@@ -33,16 +33,16 @@ public class FinolyzerDataSeederContributor
         IRepository<SharedService, int> sharedServiceRepository
         )
     {
-        _portfolioRepository = portfolioRepository;
-        _applicationSystemRepository = applicationSystemRepository;
-        _providerRepository = providerRepository;
-        _serverRepository = server;
-        _systemDependencyRepository = systemDependency;
-        _integrationServiceRepository = integrationService;
-        _providerSubscriptionRepository = providerSubscription;
-        _systemIntegrationTransactionRepository = systemIntegrationTransaction;
-        _resourceRepository = resource;
-        _sharedServiceRepository = sharedServiceRepository;
+        //_portfolioRepository = portfolioRepository;
+        //_applicationSystemRepository = applicationSystemRepository;
+        //_providerRepository = providerRepository;
+        //_serverRepository = server;
+        //_systemDependencyRepository = systemDependency;
+        //_integrationServiceRepository = integrationService;
+        //_providerSubscriptionRepository = providerSubscription;
+        //_systemIntegrationTransactionRepository = systemIntegrationTransaction;
+        //_resourceRepository = resource;
+        //_sharedServiceRepository = sharedServiceRepository;
     }
 
     public async Task SeedAsync(DataSeedContext context)
