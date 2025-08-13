@@ -66,7 +66,13 @@ namespace Finolyzer.Data
                     y.Property(x => x.Description).IsRequired();
                 });
             });
-
+            builder.Entity<ApplicatioIntegrationKey>(b =>
+            {
+                b.ToTable(DbTablePrefix + "ApplicatioIntegrationKeys", DbSchema);
+                b.ConfigureByConvention();
+                b.HasOne(x => x.ApplicationSystem).WithMany().HasForeignKey(x => x.ApplicationSystemId).OnDelete(DeleteBehavior.NoAction);
+                b.HasOne(x => x.IntegrationService).WithMany().HasForeignKey(x => x.IntegrationServiceId).OnDelete(DeleteBehavior.NoAction);
+            });
             builder.Entity<Resource>(b =>
             {
                 b.ToTable(DbTablePrefix + "Resources", DbSchema);
@@ -203,6 +209,7 @@ namespace Finolyzer.Data
                 b.ConfigureByConvention();
                 b.Property(x => x.Description).IsRequired().HasMaxLength(2000);
                 b.HasOne(x => x.IntegrationService).WithMany().HasForeignKey(x => x.IntegrationServiceId).OnDelete(DeleteBehavior.NoAction);
+                b.HasOne(x => x.ApplicatioIntegrationKey).WithMany().HasForeignKey(x => x.ApplicatioIntegrationKeyId).OnDelete(DeleteBehavior.NoAction);
                 b.HasOne(x => x.ApplicationSystem).WithMany().HasForeignKey(x => x.ApplicationSystemId).OnDelete(DeleteBehavior.NoAction);
 
                 b.HasIndex(x => new { x.Day, x.Month, x.Year }).IsUnique();

@@ -1,0 +1,16 @@
+﻿--INSERT INTO [Finolyzerdb].[dbo].[Portfolios] ([Name], [CreationTime], [Shared], [ExtraProperties], [ConcurrencyStamp]) VALUES (N'AO - Products Safety & Logistics', GETDATE(), 0, N'', NEWID());
+--INSERT INTO [Finolyzerdb].[dbo].[Portfolios] ([Name], [CreationTime], [Shared], [ExtraProperties], [ConcurrencyStamp]) VALUES (N'AO - Quality of Life', GETDATE(), 0, N'', NEWID());
+--INSERT INTO [Finolyzerdb].[dbo].[Portfolios] ([Name], [CreationTime], [Shared], [ExtraProperties], [ConcurrencyStamp]) VALUES (N'AO - Enterprise Solutions', GETDATE(), 0, N'', NEWID());
+--INSERT INTO [Finolyzerdb].[dbo].[Portfolios] ([Name], [CreationTime], [Shared], [ExtraProperties], [ConcurrencyStamp]) VALUES (N'AO - Justice, Real Estate and Urban', GETDATE(), 0, N'', NEWID());
+--INSERT INTO [Finolyzerdb].[dbo].[Portfolios] ([Name], [CreationTime], [Shared], [ExtraProperties], [ConcurrencyStamp]) VALUES (N'AO-INTG', GETDATE(), 0, N'', NEWID());
+--INSERT INTO [Finolyzerdb].[dbo].[Portfolios] ([Name], [CreationTime], [Shared], [ExtraProperties], [ConcurrencyStamp]) VALUES (N'AO - Mobility And Industrial', GETDATE(), 0, N'', NEWID());
+--INSERT INTO [Finolyzerdb].[dbo].[Portfolios] ([Name], [CreationTime], [Shared], [ExtraProperties], [ConcurrencyStamp]) VALUES (N'AO – Digital Ventures', GETDATE(), 0, N'', NEWID());
+
+
+--  INSERT INTO [Finolyzerdb].[dbo].[ApplicationSystems] ([Name], [PortfolioId],[CreationTime], [Shared], [ExtraProperties], [ConcurrencyStamp]) VALUES (N'Mwathiq', (select top 1 id from [Portfolios] where [Name]=N'AO - Justice, Real Estate and Urban'),GETDATE(), 0, N'', NEWID());
+--  INSERT INTO [Finolyzerdb].[dbo].[ApplicationSystems] ([Name], [PortfolioId],[CreationTime], [Shared], [ExtraProperties], [ConcurrencyStamp]) VALUES (N'Maroof', (select top 1 id from [Portfolios] where [Name]=N'AO - Enterprise Solutions'),GETDATE(), 0, N'', NEWID());
+--  INSERT INTO [Finolyzerdb].[dbo].[ApplicationSystems] ([Name], [PortfolioId],[CreationTime], [Shared], [ExtraProperties], [ConcurrencyStamp]) VALUES (N'Vsafty Isoft', (select top 1 id from [Portfolios] where [Name]=N'AO - Products Safety & Logistics'),GETDATE(), 0, N'', NEWID());
+--  INSERT INTO [Finolyzerdb].[dbo].[ApplicationSystems] ([Name], [PortfolioId],[CreationTime], [Shared], [ExtraProperties], [ConcurrencyStamp]) VALUES (N'Mazad', (select top 1 id from [Portfolios] where [Name]=N'AO - Justice, Real Estate and Urban'),GETDATE(), 0, N'', NEWID());
+--  INSERT INTO [Finolyzerdb].[dbo].[ApplicationSystems] ([Name], [PortfolioId],[CreationTime], [Shared], [ExtraProperties], [ConcurrencyStamp]) VALUES (N'COO', (select top 1 id from [Portfolios] where [Name]=N'AO - Mobility And Industrial'),GETDATE(), 0, N'', NEWID());
+--  INSERT INTO [Finolyzerdb].[dbo].[ApplicationSystems] ([Name], [PortfolioId],[CreationTime], [Shared], [ExtraProperties], [ConcurrencyStamp]) VALUES (N'Wathq', (select top 1 id from [Portfolios] where [Name]=N'AO – Digital Ventures'),GETDATE(), 0, N'', NEWID());
+--  INSERT INTO [Finolyzerdb].[dbo].[ApplicationSystems] ([Name], [PortfolioId],[CreationTime], [Shared], [ExtraProperties], [ConcurrencyStamp]) VALUES (N'MC - CR Renew', (select top 1 id from [Portfolios] where [Name]=N'AO - Enterprise Solutions'),GETDATE(), 0, N'', NEWID());

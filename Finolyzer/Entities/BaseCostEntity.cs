@@ -177,6 +177,7 @@ public class ApplicationSystem : BaseCostEntity
     public int PortfolioId { get; set; }
 
     public virtual ICollection<SystemDependency> SystemDependencies { get; set; }
+    public virtual ICollection<ApplicatioIntegrationKey> ApplicatioIntegrationKeys { get; set; }
     //public float TotalYearlyCost =>
     //Dependencies?.Sum(d => d.YearlyCost ?? 0) ?? 0
     //+ Servers?.Sum(s => s.YearlyCost ?? 0) ?? 0
@@ -186,6 +187,19 @@ public class ApplicationSystem : BaseCostEntity
 
 }
 
+public class ApplicatioIntegrationKey : AuditedAggregateRoot<int>
+{
+    public string Description { get; set; }
+    public string UserName { get; set; }
+    public string Password { get; set; }
+
+    public IntegrationService IntegrationService { get; set; }
+    public int IntegrationServiceId { get; set; }
+
+    public ApplicationSystem ApplicationSystem { get; set; }
+    public int ApplicationSystemId { get; set; }
+
+}
 public class SystemIntegrationTransaction : AuditedAggregateRoot<int>
 {
     public string Description { get; set; }
@@ -201,6 +215,10 @@ public class SystemIntegrationTransaction : AuditedAggregateRoot<int>
 
     public ApplicationSystem ApplicationSystem { get; set; }
     public int ApplicationSystemId { get; set; }
+
+
+    public ApplicatioIntegrationKey ApplicatioIntegrationKey { get; set; }
+    public int ApplicatioIntegrationKeyId { get; set; }
 
     public TimlyRequestType RequestType { get; set; }
 
