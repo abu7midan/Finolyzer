@@ -4,6 +4,7 @@ using Finolyzer.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Volo.Abp.EntityFrameworkCore;
 
@@ -12,14 +13,16 @@ using Volo.Abp.EntityFrameworkCore;
 namespace Finolyzer.Migrations
 {
     [DbContext(typeof(FinolyzerDbContext))]
-    partial class FinolyzerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250813112810_SystemMappingKey")]
+    partial class SystemMappingKey
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("_Abp_DatabaseProvider", EfCoreDatabaseProvider.SqlServer)
-                .HasAnnotation("ProductVersion", "9.0.8")
+                .HasAnnotation("ProductVersion", "9.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
@@ -33,6 +36,9 @@ namespace Finolyzer.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<int>("ApplicationSystemId")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("ApplicationSystemId1")
                         .HasColumnType("int");
 
                     b.Property<string>("ConcurrencyStamp")
@@ -81,6 +87,8 @@ namespace Finolyzer.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ApplicationSystemId");
+
+                    b.HasIndex("ApplicationSystemId1");
 
                     b.HasIndex("IntegrationServiceId");
 
@@ -994,34 +1002,6 @@ namespace Finolyzer.Migrations
                     b.ToTable("AbpAuditLogActions", (string)null);
                 });
 
-            modelBuilder.Entity("Volo.Abp.AuditLogging.AuditLogExcelFile", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreationTime")
-                        .HasColumnType("datetime2")
-                        .HasColumnName("CreationTime");
-
-                    b.Property<Guid?>("CreatorId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("CreatorId");
-
-                    b.Property<string>("FileName")
-                        .HasMaxLength(256)
-                        .HasColumnType("nvarchar(256)")
-                        .HasColumnName("FileName");
-
-                    b.Property<Guid?>("TenantId")
-                        .HasColumnType("uniqueidentifier")
-                        .HasColumnName("TenantId");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("AbpAuditLogExcelFiles", (string)null);
-                });
-
             modelBuilder.Entity("Volo.Abp.AuditLogging.EntityChange", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1116,10 +1096,14 @@ namespace Finolyzer.Migrations
             modelBuilder.Entity("Finolyzer.Entities.ApplicationIntegrationKey", b =>
                 {
                     b.HasOne("Finolyzer.Entities.ApplicationSystem", "ApplicationSystem")
-                        .WithMany("ApplicationIntegrationKeys")
+                        .WithMany()
                         .HasForeignKey("ApplicationSystemId")
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
+
+                    b.HasOne("Finolyzer.Entities.ApplicationSystem", null)
+                        .WithMany("ApplicationIntegrationKeys")
+                        .HasForeignKey("ApplicationSystemId1");
 
                     b.HasOne("Finolyzer.Entities.IntegrationService", "IntegrationService")
                         .WithMany()

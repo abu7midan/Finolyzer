@@ -108,6 +108,7 @@ public class Resource : BaseCostEntity
 }
 public class IntegrationService : AuditedAggregateRoot<int>
 {
+    public string SystemMappingKey { get; set; }
     public string Description { get; set; }
     public string URL { get; set; }
     public  float UnitCost { get; set; }

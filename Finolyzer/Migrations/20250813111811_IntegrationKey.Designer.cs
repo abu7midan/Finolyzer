@@ -38,8 +38,7 @@ namespace Finolyzer.Migrations
                     b.Property<int>("ApplicationSystemId")
                         .HasColumnType("int");
 
-                    b.Property<int?>("ApplicationSystemId1")
-                        .HasColumnType("int");
+                  
 
                     b.Property<string>("ConcurrencyStamp")
                         .IsConcurrencyToken()
@@ -88,7 +87,6 @@ namespace Finolyzer.Migrations
 
                     b.HasIndex("ApplicationSystemId");
 
-                    b.HasIndex("ApplicationSystemId1");
 
                     b.HasIndex("IntegrationServiceId");
 
@@ -1097,10 +1095,7 @@ namespace Finolyzer.Migrations
                         .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
 
-                    b.HasOne("Finolyzer.Entities.ApplicationSystem", null)
-                        .WithMany("ApplicatioIntegrationKeys")
-                        .HasForeignKey("ApplicationSystemId1");
-
+                  
                     b.HasOne("Finolyzer.Entities.IntegrationService", "IntegrationService")
                         .WithMany()
                         .HasForeignKey("IntegrationServiceId")

@@ -10,6 +10,7 @@ namespace Finolyzer.Data
     {
         public DbSet<Portfolio> Portfolios { get; set; }
         public DbSet<ApplicationSystem> ApplicationSystems { get; set; }
+        public DbSet<ApplicationIntegrationKey> ApplicationIntegrationKeys { get; set; }
         public DbSet<Resource> Resources { get; set; }
         public DbSet<Provider> Providers { get; set; }
         public DbSet<SystemDependency> SystemDependencies { get; set; }
@@ -76,7 +77,7 @@ namespace Finolyzer.Data
                 b.Property(x => x.ConcurrencyStamp).IsRequired().HasMaxLength(40);
 
                 b.HasOne(x => x.ApplicationSystem)
-                    .WithMany()
+                    .WithMany(x=>x.ApplicationIntegrationKeys)
                     .HasForeignKey(x => x.ApplicationSystemId)
                     .OnDelete(DeleteBehavior.NoAction);
 

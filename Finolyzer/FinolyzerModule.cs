@@ -1,11 +1,13 @@
-﻿using Finolyzer.Data;
+using Finolyzer.Data;
 using Finolyzer.Entities;
 using Finolyzer.HealthChecks;
+using Finolyzer.Jobs;
 using Finolyzer.Localization;
 using Finolyzer.Menus;
 using Finolyzer.Permissions;
 using Finolyzer.Services.CostSummaryRequests;
-using Microsoft.AspNetCore.Cors;
+using Hangfire;
+using Hangfire.SqlServer;
 using Microsoft.AspNetCore.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -13,8 +15,6 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.OpenApi.Models;
 using OpenIddict.Validation.AspNetCore;
 using Volo.Abp;
-using Volo.Abp.Account;
-using Volo.Abp.Account.Web;
 using Volo.Abp.AspNetCore.Mvc;
 using Volo.Abp.AspNetCore.Mvc.Localization;
 using Volo.Abp.AspNetCore.Mvc.UI.Bundling;
@@ -26,36 +26,23 @@ using Volo.Abp.AspNetCore.Serilog;
 using Volo.Abp.AuditLogging.EntityFrameworkCore;
 using Volo.Abp.Autofac;
 using Volo.Abp.AutoMapper;
-using Volo.Abp.BackgroundJobs.EntityFrameworkCore;
-using Volo.Abp.BlobStoring.Database.EntityFrameworkCore;
+using Volo.Abp.BackgroundJobs;
+using Volo.Abp.BackgroundJobs.Hangfire;
+using Volo.Abp.BackgroundWorkers;
 using Volo.Abp.Caching;
 using Volo.Abp.Emailing;
 using Volo.Abp.EntityFrameworkCore;
 using Volo.Abp.EntityFrameworkCore.DependencyInjection;
 using Volo.Abp.EntityFrameworkCore.SqlServer;
-using Volo.Abp.FeatureManagement;
-using Volo.Abp.FeatureManagement.EntityFrameworkCore;
-using Volo.Abp.Identity;
-using Volo.Abp.Identity.EntityFrameworkCore;
-using Volo.Abp.Identity.Web;
+using Volo.Abp.Hangfire;
 using Volo.Abp.Localization;
 using Volo.Abp.Localization.ExceptionHandling;
 using Volo.Abp.Modularity;
 using Volo.Abp.MultiTenancy;
-using Volo.Abp.OpenIddict;
-using Volo.Abp.OpenIddict.EntityFrameworkCore;
-using Volo.Abp.PermissionManagement;
-using Volo.Abp.PermissionManagement.EntityFrameworkCore;
-using Volo.Abp.PermissionManagement.HttpApi;
-using Volo.Abp.PermissionManagement.Identity;
-using Volo.Abp.PermissionManagement.OpenIddict;
-using Volo.Abp.PermissionManagement.Web;
 using Volo.Abp.Security.Claims;
-using Volo.Abp.SettingManagement;
-using Volo.Abp.SettingManagement.EntityFrameworkCore;
-using Volo.Abp.SettingManagement.Web;
 using Volo.Abp.Studio.Client.AspNetCore;
 using Volo.Abp.Swashbuckle;
+using Volo.Abp.Threading;
 using Volo.Abp.UI.Navigation;
 using Volo.Abp.UI.Navigation.Urls;
 using Volo.Abp.Validation.Localization;
@@ -72,10 +59,11 @@ namespace Finolyzer;
     typeof(AbpSwashbuckleModule),
     typeof(AbpAspNetCoreSerilogModule),
     typeof(AbpStudioClientAspNetCoreModule),
-
-    // lepton-theme
+    typeof(AbpBackgroundJobsHangfireModule),
+    typeof(AbpBackgroundJobsModule),
+    typeof(AbpBackgroundWorkersModule),
     typeof(AbpAspNetCoreMvcUiBasicThemeModule),
-     
+
     //// Account module packages
     //typeof(AbpAccountWebOpenIddictModule),
     //typeof(AbpAccountHttpApiModule),
@@ -114,15 +102,17 @@ namespace Finolyzer;
     //typeof(BlobStoringDatabaseEntityFrameworkCoreModule),
     typeof(AbpEntityFrameworkCoreSqlServerModule)
 )]
+
 public class FinolyzerModule : AbpModule
 {
     /* Single point to enable/disable multi-tenancy */
     public const bool IsMultiTenant = false;
+    public IConfiguration configuration = null;
 
     public override void PreConfigureServices(ServiceConfigurationContext context)
     {
         var hostingEnvironment = context.Services.GetHostingEnvironment();
-        var configuration = context.Services.GetConfiguration();
+        configuration = context.Services.GetConfiguration();
 
         context.Services.PreConfigure<AbpMvcDataAnnotationsLocalizationOptions>(options =>
         {
@@ -168,7 +158,7 @@ public class FinolyzerModule : AbpModule
         {
             context.Services.Replace(ServiceDescriptor.Singleton<IEmailSender, NullEmailSender>());
         }
-        ConfigureMCPServer(context);
+        //ConfigureMCPServer(context);
         //ConfigureAuthentication(context);
         //ConfigureMultiTenancy();
         ConfigureUrls(configuration);
@@ -181,13 +171,56 @@ public class FinolyzerModule : AbpModule
         ConfigureLocalization();
         ConfigureNavigationServices();
         ConfigureEfCore(context);
+        ConfigureHangfire(context, configuration);
 
         Configure<RazorPagesOptions>(options =>
         {
-            options.Conventions.AuthorizePage("/Books/Index", FinolyzerPermissions.Books.Default);
-            options.Conventions.AuthorizePage("/Books/CreateModal", FinolyzerPermissions.Books.Create);
-            options.Conventions.AuthorizePage("/Books/EditModal", FinolyzerPermissions.Books.Edit);
+            //options.Conventions.AuthorizePage("/Books/Index", FinolyzerPermissions.Books.Default);
+            //options.Conventions.AuthorizePage("/Books/CreateModal", FinolyzerPermissions.Books.Create);
+            //options.Conventions.AuthorizePage("/Books/EditModal", FinolyzerPermissions.Books.Edit);
         });
+    }
+
+    private void ConfigureHangfire(ServiceConfigurationContext context, IConfiguration configuration)
+    {
+        if (configuration.GetValue("Hangfire:IsEnabled", true))
+        {
+            context.Services.AddHangfire(config =>
+            {
+
+                config.UseSqlServerStorage(configuration.GetConnectionString("Default"));
+
+            });
+            context.Services.AddHangfireServer();
+
+
+        }
+
+
+        //Configure<AbpHangfireOptions>(options =>
+        //{
+
+        //    // If no ServerOptions is set, ABP will use the default BackgroundJobServerOptions instance.
+        //    options.ServerOptions = new BackgroundJobServerOptions
+        //    {
+        //        WorkerCount = 10,
+        //        ServerName = "Finolyzer Jobs Server",
+        //        Queues = ["default",
+        //                "Apigee",
+        //                ],
+        //    };
+        //    //    Queues = ["default",
+        //    //            "P-ELM_fingerprint",
+        //    //            "P-ELM_MVPI",
+        //    //            "P-ELM_absher-notification",
+        //    //            "nationalNotification_v1",
+        //    //            "P-ELM_yakeen",
+        //    //            "P-ELM_yakeen-vehicle",
+        //    //            "P-ELM_absher-nabaa-notification",
+        //    //            ],
+        //    //};
+        //});
+
     }
     private void ConfigureMCPServer(ServiceConfigurationContext context)
     {
@@ -373,13 +406,22 @@ public class FinolyzerModule : AbpModule
                 .Include(x => x.SystemDependencies).ThenInclude(x => x.Server).ThenInclude(x => x.Provider)
                 .Include(x => x.SystemDependencies).ThenInclude(x => x.Resource);
             });
-
+            options.Entity<ApplicationIntegrationKey>(options =>
+            {
+                options.DefaultWithDetailsFunc = query => query
+                .Include(o => o.ApplicationSystem)
+                .Include(o => o.IntegrationService).ThenInclude(x => x.Provider);
+            });
         });
     }
 
-
-    public override void OnApplicationInitialization(ApplicationInitializationContext context)
+    //public override async Task OnApplicationInitializationAsync(
+    // ApplicationInitializationContext context)
+    //{
+    //}
+    public override async void OnApplicationInitialization(ApplicationInitializationContext context)
     {
+        //context.AddBackgroundWorkerAsync<MyLogWorker>();
         var app = context.GetApplicationBuilder();
         var env = context.GetEnvironment();
 
@@ -394,6 +436,7 @@ public class FinolyzerModule : AbpModule
         {
             app.UseErrorPage();
         }
+
 
         app.UseCorrelationId();
         app.UseRouting();
@@ -420,6 +463,95 @@ public class FinolyzerModule : AbpModule
 
         app.UseAuditing();
         app.UseAbpSerilogEnrichers();
+        app.UseAbpHangfireDashboard(); //should add to the request pipeline before the app.UseConfiguredEndpoints()
+                                       //ExecuteJobs(configuration);
+                                       //await context.AddBackgroundWorkerAsync<MyLogWorker>();
+                                       //BackgroundJob.Enqueue(() => Console.WriteLine("Hello, world!"));
+                                       //AsyncHelper.RunSync(() => backgroundWorkerManager.AddAsync(worker));
+                                       // resolve JobScheduler from DI
+        var jobScheduler = context.ServiceProvider.GetRequiredService<JobScheduler>();
+        await jobScheduler.ScheduleJobsAsync();
+        // var argsjobs = new ApigeeAnalyticsJobArgs
+        // {
+        //     RecurringJobId = "apigee_transactions_monthly",
+        //     CronExpression = Cron.Monthly(),
+        //     ServiceName = "apigee_service",
+        //     ReportDate = DateTime.UtcNow,
+        //     EmailDeveloper = "dev@company.com"
+        // };
+        // RecurringJob.RemoveIfExists(argsjobs.RecurringJobId);
+
+        // RecurringJob.AddOrUpdate<SystemIntegrationTransactionJob>(recurringJobId: argsjobs.RecurringJobId, methodCall: job => job.RunAsync(argsjobs), cronExpression: argsjobs.CronExpression, timeZone: TimeZoneInfo.Local);
+
+        // RecurringJob.RemoveIfExists("Monthly-CostSummary");
+        //RecurringJob.AddOrUpdate<CostSummaryJob>("Monthly-CostSummary",job => job.RunAsync(argsjobs),    Cron.Monthly,TimeZoneInfo.Local);
+
+        //BackgroundJob.Enqueue<CostSummaryJob>(job => job.RunAsync("MyCustomService"));
+        //RecurringJob.AddOrUpdate<CostSummaryJob>("Monthly-CostSummary",job => job.RunAsync("DefaultService"),    Cron.Monthly,TimeZoneInfo.Local);
+        //_ = context.AddBackgroundWorkerAsync<InitDataWorker>();
         app.UseConfiguredEndpoints();
+
+    }
+    //private void ExecuteJobs(IConfiguration configuration)
+    //{
+    //    RecurringJob.RemoveIfExists(nameof(ISubscriptionAppService.CancelExpiredSubscriptions));
+    //    if (bool.Parse(configuration["BackgroundWorkers:CancelExpiredSubscriptionsWorker:IsEnabled"]))
+    //    {
+    //        RecurringJob.AddOrUpdate<ISubscriptionAppService>("CancelExpiredSubscriptions", d => d.CancelExpiredSubscriptions(), configuration["BackgroundWorkers:CancelExpiredSubscriptionsWorker:Cron"], TimeZoneInfo.FindSystemTimeZoneById("Arabic Standard Time"));
+    //        //RecurringJob.AddOrUpdate<ISubscriptionAppService>("CancelExpiredBills", d => d.CancelExpiredBills(), configuration["BackgroundWorkers:CancelExpiredBillsWorker:Cron"], TimeZoneInfo.FindSystemTimeZoneById("Arabic Standard Time"));
+
+
+    //    }
+    //    RecurringJob.RemoveIfExists(nameof(ISubscriptionAppService.CancelExpiredBills));
+    //    bool isEnabled = bool.Parse(configuration["BackgroundWorkers:CancelExpiredBillsWorker:IsEnabled"]);
+    //    if (isEnabled)
+    //    {
+    //        RecurringJob.AddOrUpdate<ISubscriptionAppService>("CancelExpiredBills", d => d.CancelExpiredBills(), configuration["BackgroundWorkers:CancelExpiredBillsWorker:Cron"], TimeZoneInfo.FindSystemTimeZoneById("Arabic Standard Time"));
+    //    }
+
+    //    RecurringJob.RemoveIfExists(nameof(IReservationsAppService.AddSuReservations));
+    //    isEnabled = bool.Parse(configuration["BackgroundWorkers:AddSuReservationsWorker:IsEnabled"]);
+    //    if (isEnabled)
+    //    {
+    //        RecurringJob.AddOrUpdate<IReservationsAppService>("AddSuReservationsWorker", d => d.AddSuReservations(),
+    //            configuration["BackgroundWorkers:AddSuReservationsWorker:Cron"],
+    //            TimeZoneInfo.FindSystemTimeZoneById("Arabic Standard Time"));
+    //    }
+    //    RecurringJob.RemoveIfExists(nameof(IReservationsAppService.AcknowledgeSUReservations));
+    //    isEnabled = bool.Parse(configuration["BackgroundWorkers:AcknowledgeSUReservationsWorker:IsEnabled"]);
+    //    if (isEnabled)
+    //    {
+    //        RecurringJob.AddOrUpdate<IReservationsAppService>("AcknowledgeSUReservationsWorker", d => d.AcknowledgeSUReservations(),
+    //            configuration["BackgroundWorkers:AcknowledgeSUReservationsWorker:Cron"],
+    //            TimeZoneInfo.FindSystemTimeZoneById("Arabic Standard Time"));
+    //    }
+    //    isEnabled = bool.Parse(configuration["BackgroundWorkers:PackageRequestExpirationWorker:IsEnabled"]);
+    //    if (isEnabled)
+    //    {
+    //        RecurringJob.AddOrUpdate<IPackageAppService>("PackageRequestExpirationWorker", d => d.ExpirePackageRequest(),
+    //            configuration["BackgroundWorkers:PackageRequestExpirationWorker:Cron"],
+    //            TimeZoneInfo.FindSystemTimeZoneById("Arabic Standard Time"));
+    //    }
+    //}
+    private async Task AddBackgroundWorkersAsync(ApplicationInitializationContext context, IConfiguration configuration)
+    {
+        if (WorkerIsEnabled<LocalPeriodicWorker>(configuration))
+        {
+            await context.AddBackgroundWorkerAsync<LocalPeriodicWorker>();
+        }
+
+        if (WorkerIsEnabled<LocalHangfireBackgroundWorker>(configuration))
+        {
+            await context.AddBackgroundWorkerAsync<LocalHangfireBackgroundWorker>();
+        }
+        //if (WorkerIsEnabled<CancelExpiredSubscriptionsWorker>(configuration))
+        //{
+        //    await context.AddBackgroundWorkerAsync<CancelExpiredSubscriptionsWorker>();
+        //}
+    }
+
+    private bool WorkerIsEnabled<T>(IConfiguration configuration)
+    {
+        return configuration.GetValue($"BackgroundWorkers:{typeof(T).Name}:IsEnabled", true);
     }
 }
