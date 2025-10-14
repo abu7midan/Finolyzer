@@ -237,7 +237,7 @@ namespace Finolyzer.Data
                     .HasForeignKey(x => x.ApplicationIntegrationKeyId)
                     .OnDelete(DeleteBehavior.NoAction);
 
-                b.HasIndex(x => new { x.Day, x.Month, x.Year })
+                b.HasIndex(x => new { x.ApplicationSystemId,x.ApplicationIntegrationKeyId,x.IntegrationServiceId,x.Day, x.Month, x.Year })
                     .IsUnique();
             });
         }

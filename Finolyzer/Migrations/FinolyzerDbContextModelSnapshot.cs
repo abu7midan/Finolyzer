@@ -812,11 +812,9 @@ namespace Finolyzer.Migrations
 
                     b.HasIndex("ApplicationIntegrationKeyId");
 
-                    b.HasIndex("ApplicationSystemId");
-
                     b.HasIndex("IntegrationServiceId");
 
-                    b.HasIndex("Day", "Month", "Year")
+                    b.HasIndex("ApplicationSystemId", "ApplicationIntegrationKeyId", "IntegrationServiceId", "Day", "Month", "Year")
                         .IsUnique();
 
                     b.ToTable("SystemIntegrationTransactions", (string)null);

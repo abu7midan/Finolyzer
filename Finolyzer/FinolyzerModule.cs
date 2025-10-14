@@ -412,6 +412,12 @@ public class FinolyzerModule : AbpModule
                 .Include(o => o.ApplicationSystem)
                 .Include(o => o.IntegrationService).ThenInclude(x => x.Provider);
             });
+            options.Entity<SystemIntegrationTransaction>(options =>
+            {
+                options.DefaultWithDetailsFunc = query => query
+                .Include(o => o.ApplicationSystem)
+                .Include(o => o.IntegrationService).ThenInclude(x => x.Provider);
+            });
         });
     }
 
