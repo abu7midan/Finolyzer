@@ -175,9 +175,9 @@ public class FinolyzerModule : AbpModule
 
         Configure<RazorPagesOptions>(options =>
         {
-            //options.Conventions.AuthorizePage("/Books/Index", FinolyzerPermissions.Books.Default);
-            //options.Conventions.AuthorizePage("/Books/CreateModal", FinolyzerPermissions.Books.Create);
-            //options.Conventions.AuthorizePage("/Books/EditModal", FinolyzerPermissions.Books.Edit);
+            options.Conventions.AuthorizePage("/Books/Index", FinolyzerPermissions.Books.Default);
+            options.Conventions.AuthorizePage("/Books/CreateModal", FinolyzerPermissions.Books.Create);
+            options.Conventions.AuthorizePage("/Books/EditModal", FinolyzerPermissions.Books.Edit);
         });
     }
 
@@ -425,9 +425,59 @@ public class FinolyzerModule : AbpModule
     // ApplicationInitializationContext context)
     //{
     //}
+    //public override async void OnApplicationInitialization(ApplicationInitializationContext context)
+    //{
+    //    var app = context.GetApplicationBuilder();
+    //    var env = context.GetEnvironment();
+
+    //    if (env.IsDevelopment())
+    //    {
+    //        app.UseDeveloperExceptionPage();
+    //    }
+
+    //    app.UseAbpRequestLocalization();
+
+    //    if (!env.IsDevelopment())
+    //    {
+    //        app.UseErrorPage();
+    //    }
+
+
+    //    app.UseCorrelationId();
+    //    app.UseRouting();
+    //    app.MapAbpStaticAssets();
+    //    app.UseAbpStudioLink();
+    //    app.UseAbpSecurityHeaders();
+    //    //app.UseAuthentication();
+    //    //app.UseAbpOpenIddictValidation();
+
+    //    //if (IsMultiTenant)
+    //    //{
+    //    //    app.UseMultiTenancy();
+    //    //}
+
+    //    app.UseUnitOfWork();
+    //    app.UseDynamicClaims();
+    //    //app.UseAuthorization();
+
+    //    app.UseSwagger();
+    //    app.UseAbpSwaggerUI(options =>
+    //    {
+    //        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Finolyzer API");
+    //    });
+
+    //    app.UseAuditing();
+    //    app.UseAbpSerilogEnrichers();
+    //    app.UseAbpHangfireDashboard(); 
+    //    var jobScheduler = context.ServiceProvider.GetRequiredService<JobScheduler>();
+    //    await jobScheduler.ScheduleJobsAsync();
+
+    //    app.UseConfiguredEndpoints();
+
+    //}
+
     public override async void OnApplicationInitialization(ApplicationInitializationContext context)
     {
-        //context.AddBackgroundWorkerAsync<MyLogWorker>();
         var app = context.GetApplicationBuilder();
         var env = context.GetEnvironment();
 
@@ -443,7 +493,6 @@ public class FinolyzerModule : AbpModule
             app.UseErrorPage();
         }
 
-
         app.UseCorrelationId();
         app.UseRouting();
         app.MapAbpStaticAssets();
@@ -452,112 +501,28 @@ public class FinolyzerModule : AbpModule
         //app.UseAuthentication();
         //app.UseAbpOpenIddictValidation();
 
-        //if (IsMultiTenant)
-        //{
-        //    app.UseMultiTenancy();
-        //}
+        if (IsMultiTenant)
+        {
+            app.UseMultiTenancy();
+        }
 
         app.UseUnitOfWork();
         app.UseDynamicClaims();
-        //app.UseAuthorization();
+        app.UseAuthorization();
 
         app.UseSwagger();
         app.UseAbpSwaggerUI(options =>
         {
-            options.SwaggerEndpoint("/swagger/v1/swagger.json", "Finolyzer API");
+            options.SwaggerEndpoint("/swagger/v1/swagger.json", "AbpSolution1 API");
         });
 
         app.UseAuditing();
         app.UseAbpSerilogEnrichers();
-        app.UseAbpHangfireDashboard(); //should add to the request pipeline before the app.UseConfiguredEndpoints()
-                                       //ExecuteJobs(configuration);
-                                       //await context.AddBackgroundWorkerAsync<MyLogWorker>();
-                                       //BackgroundJob.Enqueue(() => Console.WriteLine("Hello, world!"));
-                                       //AsyncHelper.RunSync(() => backgroundWorkerManager.AddAsync(worker));
-                                       // resolve JobScheduler from DI
+        app.UseAbpHangfireDashboard();
         var jobScheduler = context.ServiceProvider.GetRequiredService<JobScheduler>();
         await jobScheduler.ScheduleJobsAsync();
-        // var argsjobs = new ApigeeAnalyticsJobArgs
-        // {
-        //     RecurringJobId = "apigee_transactions_monthly",
-        //     CronExpression = Cron.Monthly(),
-        //     ServiceName = "apigee_service",
-        //     ReportDate = DateTime.UtcNow,
-        //     EmailDeveloper = "dev@company.com"
-        // };
-        // RecurringJob.RemoveIfExists(argsjobs.RecurringJobId);
-
-        // RecurringJob.AddOrUpdate<SystemIntegrationTransactionJob>(recurringJobId: argsjobs.RecurringJobId, methodCall: job => job.RunAsync(argsjobs), cronExpression: argsjobs.CronExpression, timeZone: TimeZoneInfo.Local);
-
-        // RecurringJob.RemoveIfExists("Monthly-CostSummary");
-        //RecurringJob.AddOrUpdate<CostSummaryJob>("Monthly-CostSummary",job => job.RunAsync(argsjobs),    Cron.Monthly,TimeZoneInfo.Local);
-
-        //BackgroundJob.Enqueue<CostSummaryJob>(job => job.RunAsync("MyCustomService"));
-        //RecurringJob.AddOrUpdate<CostSummaryJob>("Monthly-CostSummary",job => job.RunAsync("DefaultService"),    Cron.Monthly,TimeZoneInfo.Local);
-        //_ = context.AddBackgroundWorkerAsync<InitDataWorker>();
         app.UseConfiguredEndpoints();
-
     }
-    //private void ExecuteJobs(IConfiguration configuration)
-    //{
-    //    RecurringJob.RemoveIfExists(nameof(ISubscriptionAppService.CancelExpiredSubscriptions));
-    //    if (bool.Parse(configuration["BackgroundWorkers:CancelExpiredSubscriptionsWorker:IsEnabled"]))
-    //    {
-    //        RecurringJob.AddOrUpdate<ISubscriptionAppService>("CancelExpiredSubscriptions", d => d.CancelExpiredSubscriptions(), configuration["BackgroundWorkers:CancelExpiredSubscriptionsWorker:Cron"], TimeZoneInfo.FindSystemTimeZoneById("Arabic Standard Time"));
-    //        //RecurringJob.AddOrUpdate<ISubscriptionAppService>("CancelExpiredBills", d => d.CancelExpiredBills(), configuration["BackgroundWorkers:CancelExpiredBillsWorker:Cron"], TimeZoneInfo.FindSystemTimeZoneById("Arabic Standard Time"));
+   
 
-
-    //    }
-    //    RecurringJob.RemoveIfExists(nameof(ISubscriptionAppService.CancelExpiredBills));
-    //    bool isEnabled = bool.Parse(configuration["BackgroundWorkers:CancelExpiredBillsWorker:IsEnabled"]);
-    //    if (isEnabled)
-    //    {
-    //        RecurringJob.AddOrUpdate<ISubscriptionAppService>("CancelExpiredBills", d => d.CancelExpiredBills(), configuration["BackgroundWorkers:CancelExpiredBillsWorker:Cron"], TimeZoneInfo.FindSystemTimeZoneById("Arabic Standard Time"));
-    //    }
-
-    //    RecurringJob.RemoveIfExists(nameof(IReservationsAppService.AddSuReservations));
-    //    isEnabled = bool.Parse(configuration["BackgroundWorkers:AddSuReservationsWorker:IsEnabled"]);
-    //    if (isEnabled)
-    //    {
-    //        RecurringJob.AddOrUpdate<IReservationsAppService>("AddSuReservationsWorker", d => d.AddSuReservations(),
-    //            configuration["BackgroundWorkers:AddSuReservationsWorker:Cron"],
-    //            TimeZoneInfo.FindSystemTimeZoneById("Arabic Standard Time"));
-    //    }
-    //    RecurringJob.RemoveIfExists(nameof(IReservationsAppService.AcknowledgeSUReservations));
-    //    isEnabled = bool.Parse(configuration["BackgroundWorkers:AcknowledgeSUReservationsWorker:IsEnabled"]);
-    //    if (isEnabled)
-    //    {
-    //        RecurringJob.AddOrUpdate<IReservationsAppService>("AcknowledgeSUReservationsWorker", d => d.AcknowledgeSUReservations(),
-    //            configuration["BackgroundWorkers:AcknowledgeSUReservationsWorker:Cron"],
-    //            TimeZoneInfo.FindSystemTimeZoneById("Arabic Standard Time"));
-    //    }
-    //    isEnabled = bool.Parse(configuration["BackgroundWorkers:PackageRequestExpirationWorker:IsEnabled"]);
-    //    if (isEnabled)
-    //    {
-    //        RecurringJob.AddOrUpdate<IPackageAppService>("PackageRequestExpirationWorker", d => d.ExpirePackageRequest(),
-    //            configuration["BackgroundWorkers:PackageRequestExpirationWorker:Cron"],
-    //            TimeZoneInfo.FindSystemTimeZoneById("Arabic Standard Time"));
-    //    }
-    //}
-    private async Task AddBackgroundWorkersAsync(ApplicationInitializationContext context, IConfiguration configuration)
-    {
-        if (WorkerIsEnabled<LocalPeriodicWorker>(configuration))
-        {
-            await context.AddBackgroundWorkerAsync<LocalPeriodicWorker>();
-        }
-
-        if (WorkerIsEnabled<LocalHangfireBackgroundWorker>(configuration))
-        {
-            await context.AddBackgroundWorkerAsync<LocalHangfireBackgroundWorker>();
-        }
-        //if (WorkerIsEnabled<CancelExpiredSubscriptionsWorker>(configuration))
-        //{
-        //    await context.AddBackgroundWorkerAsync<CancelExpiredSubscriptionsWorker>();
-        //}
-    }
-
-    private bool WorkerIsEnabled<T>(IConfiguration configuration)
-    {
-        return configuration.GetValue($"BackgroundWorkers:{typeof(T).Name}:IsEnabled", true);
-    }
 }

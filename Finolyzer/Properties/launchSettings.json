@@ -13,14 +13,14 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       },
-      "applicationUrl": "http://localhost:44337/"
+      "applicationUrl": "http://localhost:5000/" // Change the port to a non-SSL port
     }
   },
   "iisSettings": {
     "windowsAuthentication": false,
     "anonymousAuthentication": true,
     "iisExpress": {
-      "applicationUrl": "http://localhost:44337/",
+      "applicationUrl": "http://localhost:5000/", // Match the port to the "Finolyzer" profile
       "sslPort": 0
     }
   }
