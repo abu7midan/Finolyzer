@@ -475,8 +475,7 @@ public class FinolyzerModule : AbpModule
     //    app.UseConfiguredEndpoints();
 
     //}
-
-    public override async void OnApplicationInitialization(ApplicationInitializationContext context)
+    public async override Task OnApplicationInitializationAsync(ApplicationInitializationContext context)
     {
         var app = context.GetApplicationBuilder();
         var env = context.GetEnvironment();
