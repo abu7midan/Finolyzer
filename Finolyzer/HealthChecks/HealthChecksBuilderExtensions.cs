@@ -7,33 +7,33 @@ public static class HealthChecksBuilderExtensions
 {
     public static void AddFinolyzerHealthChecks(this IServiceCollection services)
     {
-        // Add your health checks here
-        var healthChecksBuilder = services.AddHealthChecks();
-        healthChecksBuilder.AddCheck<FinolyzerDatabaseCheck>("Finolyzer DbContext Check", tags: new string[] { "database" });
+        //// Add your health checks here
+        //var healthChecksBuilder = services.AddHealthChecks();
+        //healthChecksBuilder.AddCheck<FinolyzerDatabaseCheck>("Finolyzer DbContext Check", tags: new string[] { "database" });
 
-        var configuration = services.GetConfiguration();
-        var healthCheckUrl = configuration["App:HealthCheckUrl"];
+        //var configuration = services.GetConfiguration();
+        //var healthCheckUrl = configuration["App:HealthCheckUrl"];
 
-        if (string.IsNullOrEmpty(healthCheckUrl))
-        {
-            healthCheckUrl = "/health-status";
-        }
+        //if (string.IsNullOrEmpty(healthCheckUrl))
+        //{
+        //    healthCheckUrl = "/health-status";
+        //}
         
-        services.ConfigureHealthCheckEndpoint("/health-status");
+        //services.ConfigureHealthCheckEndpoint("/health-status");
 
-        var healthChecksUiBuilder = services.AddHealthChecksUI(settings =>
-        {
-            settings.AddHealthCheckEndpoint("Finolyzer Health Status", healthCheckUrl);
-        });
+        //var healthChecksUiBuilder = services.AddHealthChecksUI(settings =>
+        //{
+        //    settings.AddHealthCheckEndpoint("Finolyzer Health Status", healthCheckUrl);
+        //});
 
-        // Set your HealthCheck UI Storage here
-        healthChecksUiBuilder.AddInMemoryStorage();
+        //// Set your HealthCheck UI Storage here
+        //healthChecksUiBuilder.AddInMemoryStorage();
 
-        services.MapHealthChecksUiEndpoints(options =>
-        {
-            options.UIPath = "/health-ui";
-            options.ApiPath = "/health-api";
-        });
+        //services.MapHealthChecksUiEndpoints(options =>
+        //{
+        //    options.UIPath = "/health-ui";
+        //    options.ApiPath = "/health-api";
+        //});
     }
 
     private static IServiceCollection ConfigureHealthCheckEndpoint(this IServiceCollection services, string path)

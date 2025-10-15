@@ -42,7 +42,6 @@ namespace Finolyzer.Pages.CostSummaryRequests
                 .Select(x => new SelectListItem(x.Name, x.Id.ToString()))
                 .ToList();
         }
-
         public async Task<IActionResult> OnPostAsync()
         {
             var result = await _bookAppService.CalculateAsync(CostSummaryRequest);

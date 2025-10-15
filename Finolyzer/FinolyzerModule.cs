@@ -175,9 +175,9 @@ public class FinolyzerModule : AbpModule
 
         Configure<RazorPagesOptions>(options =>
         {
-            options.Conventions.AuthorizePage("/Books/Index", FinolyzerPermissions.Books.Default);
-            options.Conventions.AuthorizePage("/Books/CreateModal", FinolyzerPermissions.Books.Create);
-            options.Conventions.AuthorizePage("/Books/EditModal", FinolyzerPermissions.Books.Edit);
+            //options.Conventions.AuthorizePage("/Books/Index", FinolyzerPermissions.Books.Default);
+            //options.Conventions.AuthorizePage("/Books/CreateModal", FinolyzerPermissions.Books.Create);
+            //options.Conventions.AuthorizePage("/Books/EditModal", FinolyzerPermissions.Books.Edit);
         });
     }
 
@@ -497,7 +497,7 @@ public class FinolyzerModule : AbpModule
         app.MapAbpStaticAssets();
         app.UseAbpStudioLink();
         app.UseAbpSecurityHeaders();
-        //app.UseAuthentication();
+        app.UseAuthentication();
         //app.UseAbpOpenIddictValidation();
 
         if (IsMultiTenant)
