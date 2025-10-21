@@ -9,6 +9,7 @@ using Finolyzer.Services.CostSummaryRequests;
 using Hangfire;
 using Hangfire.SqlServer;
 using Microsoft.AspNetCore.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -175,6 +176,7 @@ public class FinolyzerModule : AbpModule
 
         Configure<RazorPagesOptions>(options =>
         {
+            options.Conventions.ConfigureFilter(new IgnoreAntiforgeryTokenAttribute());
             //options.Conventions.AuthorizePage("/Books/Index", FinolyzerPermissions.Books.Default);
             //options.Conventions.AuthorizePage("/Books/CreateModal", FinolyzerPermissions.Books.Create);
             //options.Conventions.AuthorizePage("/Books/EditModal", FinolyzerPermissions.Books.Edit);
