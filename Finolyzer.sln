@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Finolyzer", "Finolyzer\Fino
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Finolyzer.MCP.Client", "Finolyzer.MCP.Client\Finolyzer.MCP.Client.csproj", "{AABB82BD-CE37-4F4B-AE4B-400BFE706D85}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Finolyzer.AIOPS", "Finolyzer.AIOPS\Finolyzer.AIOPS.csproj", "{BF211501-6447-44C5-9B1B-2437B2A2B728}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{AABB82BD-CE37-4F4B-AE4B-400BFE706D85}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{AABB82BD-CE37-4F4B-AE4B-400BFE706D85}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{AABB82BD-CE37-4F4B-AE4B-400BFE706D85}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BF211501-6447-44C5-9B1B-2437B2A2B728}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BF211501-6447-44C5-9B1B-2437B2A2B728}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BF211501-6447-44C5-9B1B-2437B2A2B728}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BF211501-6447-44C5-9B1B-2437B2A2B728}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

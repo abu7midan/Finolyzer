@@ -1,0 +1,6 @@
+@Finolyzer.AIOPS_HostAddress = http://localhost:5048
+
+GET {{Finolyzer.AIOPS_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
