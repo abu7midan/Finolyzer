@@ -12,7 +12,8 @@ public enum DependencyType
     Server = 1,
     ProviderSubscription = 2,
     IntegrationService = 3,
-    Resource = 4
+    Resource = 4,
+    SharedService = 5
 }
 public enum IntegrationSubscriptionType
 {
