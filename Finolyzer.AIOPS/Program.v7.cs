@@ -1,76 +1,76 @@
-﻿// Program.cs
-// .NET 9 Minimal API + ML.NET (cluster-only + runtime anomaly score + trend guard)
-// EXPORT (per-hour, last 30d): fetch TOP N docs **per hour window** for metrics, APM transactions, APM metrics, APM spans, APM errors
-// TRAIN from exported NDJSON files, SUGGEST from files
-// Verbose console logging throughout.
+﻿// Program.v7plus.fixed.cs
+// CostAdvisor — .NET 9 Minimal API (cards+parallel exporter+robust logging)
 //
-// Endpoints:
-//   GET  /health
-//   POST /train            -> (optionally) export per-hour (size=N) for last 30d, then train KMeans
-//   GET  /suggestions      -> load model, rebuild features+APM signals from NDJSON, compute suggestions
-//
-// NuGet: Microsoft.ML (+ Microsoft.ML.Mkl.Components optional)
+// Fixes vs previous drop:
+// - Switched ES query builders to C# raw string literals (no escaping issues).
+// - Ensured helper accumulator types are nested and not marked private (avoid protection-level parse fallout if braces mismatch).
+// - No top-level statements; everything inside types/namespaces.
+// - Same feature/carding/export enhancements as v7plus.
 
+using CostAdvisor;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.ML;
 using Microsoft.ML.Data;
 using Microsoft.ML.Transforms;
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using System.Linq;
 using System.Text.Json;
 
 namespace CostAdvisor;
 
-// -------------------- DTOs --------------------
+// =============================
+// Domain DTOs / Signals / Cards
+// =============================
 public sealed class HostFeatures
 {
     public string Host { get; set; } = "";
-
-    // Core features used by ML
+    // Core ML features
     public float MemP95GiB { get; set; }
     public float CpuP95 { get; set; }             // 0..1
     public float NetInP95Kbps { get; set; }
     public float NetOutP95Kbps { get; set; }
     public float RpmP95 { get; set; }
-    public float MemHeadroomGiB { get; set; }     // alloc - p95
-    public float CpuHeadroom { get; set; }        // 1 - cpu_p95
-    public float IdleFraction { get; set; }       // docs with cpu<5% / total docs
+    public float MemHeadroomGiB { get; set; }
+    public float CpuHeadroom { get; set; }
+    public float IdleFraction { get; set; }
     public float OffhoursIdleFraction { get; set; }
-    public float DataCompleteness { get; set; }   // non-empty hours / 720 (approx)
+    public float DataCompleteness { get; set; }
     public float AllocMemGiB { get; set; }
-
     // Extra stats (for messaging)
-    public float CpuMax { get; set; }                 // 0..1
-    public float MemUsedMaxGiB { get; set; }          // max observed (GiB)
+    public float CpuMax { get; set; }
+    public float MemUsedMaxGiB { get; set; }
     public float NetInMaxKbps { get; set; }
     public float NetOutMaxKbps { get; set; }
     public int HoursObserved { get; set; }
     public long TotalDocs { get; set; }
 }
 
-// APM (transactions) traffic & reliability
 public sealed class ApmSignals
 {
     public string Host { get; set; } = "";
-    public float ErrorRate { get; set; }          // failures / total (from transactions)
-    public float LatencyP95Ms { get; set; }       // ms (from transactions)
-    public float ApproxRpmP95 { get; set; }       // from minute buckets in sample
+    public float ErrorRate { get; set; }
+    public float LatencyP95Ms { get; set; }
+    public float ApproxRpmP95 { get; set; }
     public string? TopService { get; set; }
 }
 
-// [APM-NEW] GC / CLR metrics snapshot
 public sealed class ApmClrSignals
 {
     public string Host { get; set; } = "";
     public float GcCountPerMinP95 { get; set; }
-    public float GcTimePctP95 { get; set; }         // 0..100 (approx)
+    public float GcTimePctP95 { get; set; }
     public float Gen2SizeP95GiB { get; set; }
     public float Gen3SizeP95GiB { get; set; }
     public float Gen2SizeMaxGiB { get; set; }
     public float Gen3SizeMaxGiB { get; set; }
 }
 
-// [APM-NEW] Integrations & exceptions snapshot
 public sealed class ApmIntegrationSignals
 {
     public string Host { get; set; } = "";
@@ -92,8 +92,7 @@ public sealed class AnomalyOutput
 
 public sealed class ClusterOutput
 {
-    [ColumnName("PredictedLabel")]
-    public uint ClusterId { get; set; }
+    [ColumnName("PredictedLabel")] public uint ClusterId { get; set; }
     public float[]? Distance { get; set; }
 }
 
@@ -120,7 +119,29 @@ public static class Columns
     };
 }
 
-// -------------------- ML Trainer (cluster only; anomaly computed at runtime) --------------------
+// =============================
+// Suggestion Cards (presentation)
+// =============================
+public enum SuggestionLabel { Cost, Performance, Reliability, Operations }
+public enum Severity { Info = 0, Low = 1, Medium = 2, High = 3, Critical = 4 }
+
+public sealed class SuggestionCard
+{
+    public string Kind { get; set; } = string.Empty;          // e.g., "increase_cpu"
+    public string Title { get; set; } = string.Empty;         // action-oriented
+    public string Why { get; set; } = string.Empty;           // reason
+    public string Action { get; set; } = string.Empty;        // what to do
+    public string Impact { get; set; } = string.Empty;        // expected outcome
+    public string RiskIfIgnored { get; set; } = string.Empty; // urgency
+    public Severity Severity { get; set; } = Severity.Info;
+    public double Confidence { get; set; }                    // 0..1
+    public string[] Labels { get; set; } = Array.Empty<string>();
+    public object Evidence { get; set; } = new { };
+}
+
+// =============================
+// ML Trainer (cluster-only)
+// =============================
 public static class ModelTrainer
 {
     private const string ClusterModelFile = "cluster_v2.zip";
@@ -215,7 +236,9 @@ public static class ModelTrainer
     public static string ClusterModelPath(string modelDir) => Path.Combine(modelDir, ClusterModelFile);
 }
 
-// -------------------- Runtime anomaly scoring --------------------
+// =============================
+// Runtime anomaly scoring
+// =============================
 static class AnomalyScoring
 {
     public static Dictionary<string, (double mean, double std)> ComputeStats(List<HostFeatures> rows, string[] cols)
@@ -278,7 +301,9 @@ static class AnomalyScoring
     }
 }
 
-// -------------------- Trend guard --------------------
+// =============================
+// Trend guard
+// =============================
 public static class TrendGuard
 {
     public static bool IsTrendingUp(float[] cpuSeries, int minPoints = 24 * 7, double slopeThreshold = 0.0007)
@@ -294,7 +319,9 @@ public static class TrendGuard
     }
 }
 
-// -------------------- Streaming percentile (P²) --------------------
+// =============================
+// Streaming percentile (P²)
+// =============================
 public sealed class P2Quantile
 {
     private readonly double q;
@@ -343,7 +370,9 @@ public sealed class P2Quantile
     }
 }
 
-// -------------------- API --------------------
+// =============================
+// API Program
+// =============================
 public class Program
 {
     // ======= Config =======
@@ -351,16 +380,16 @@ public class Program
     internal static string EsApiKeyBase64 => Environment.GetEnvironmentVariable("ES_API_KEY_BASE64") ?? "enhTTEJwb0JTRmJRbGFOT0RVdmY6YlZmd1BwamZTQWVVTTQ2T2Nlek94Zw==";
     internal static string MetricsIndex => Environment.GetEnvironmentVariable("MB_INDEX") ?? ".ds-metricbeat-*,metricbeat-*,metricbeat-psintg-*,metricbeat-rabbitmq-*,metrics-*-elk,*metricbeat*,*metric*";
     internal static string ApmTxIndex => Environment.GetEnvironmentVariable("APM_TX_INDEX") ?? "traces-apm*,apm-*";
-    internal static string ApmMetricsIndex => Environment.GetEnvironmentVariable("APM_METRIC_INDEX") ?? "apm-*-metric-*"; // [APM-NEW]
-    internal static string ApmSpanIndex => Environment.GetEnvironmentVariable("APM_SPAN_INDEX") ?? "apm-*-span-*";       // [APM-NEW]
-    internal static string ApmErrorIndex => Environment.GetEnvironmentVariable("APM_ERROR_INDEX") ?? "apm-*-error-*";    // [APM-NEW]
+    internal static string ApmMetricsIndex => Environment.GetEnvironmentVariable("APM_METRIC_INDEX") ?? "apm-*-metric-*"; // CLR/GC
+    internal static string ApmSpanIndex => Environment.GetEnvironmentVariable("APM_SPAN_INDEX") ?? "apm-*-span-*";       // Integrations
+    internal static string ApmErrorIndex => Environment.GetEnvironmentVariable("APM_ERROR_INDEX") ?? "apm-*-error-*";    // Exceptions
 
     // Export destinations
     internal static string MetricsOutDir => "./data/metrics";
     internal static string ApmTxOutDir => "./data/apm_tx";
-    internal static string ApmMetricsOutDir => "./data/apm_metrics";   // [APM-NEW]
-    internal static string ApmSpanOutDir => "./data/apm_spans";        // [APM-NEW]
-    internal static string ApmErrorOutDir => "./data/apm_errors";      // [APM-NEW]
+    internal static string ApmMetricsOutDir => "./data/apm_metrics";
+    internal static string ApmSpanOutDir => "./data/apm_spans";
+    internal static string ApmErrorOutDir => "./data/apm_errors";
 
     // Thresholds
     internal const float ErrorRateWarn = 0.015f;     // 1.5%
@@ -369,16 +398,26 @@ public class Program
 
     internal const float CpuHighThreshold = 0.75f;   // 75% p95
     internal const float CpuVeryHighMax = 0.90f;     // 90% max
-    internal const float MemHeadroomLowGiB = 0.5f;   // < 0.5 GiB headroom
+    internal const float MemHeadroomLowGiB = 0.5f;   // < 0.5 GiB
     internal const float MemTightRatio = 0.85f;      // p95/alloc >= 85%
 
     // GC heuristics
     internal const float GcTimePctWarn = 10f;        // p95 GC% over sampled mins
-    internal const float Gen23ShareWarn = 0.60f;     // (gen2+gen3) / alloc > 60% → LOH/fragmentation suspicion
-    internal const int FailedSpanWarn = 5;         // per 30d sample
+    internal const float Gen23ShareWarn = 0.60f;     // (gen2+gen3)/alloc > 60%
+    internal const int FailedSpanWarn = 5;
 
-    // Per-hour export cap
+    // Per-hour export cap & DOP
     internal const int PerHourSize = 100;
+    internal static int ExportMaxDop => int.TryParse(Environment.GetEnvironmentVariable("EXPORT_MAX_DOP"), out var v) && v > 0 ? Math.Clamp(v, 1, 24) : 6;
+
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        WriteIndented = false
+    };
+
+    private static readonly DateTime StartUtc = DateTime.UtcNow;
 
     public static async Task Main(string[] args)
     {
@@ -387,18 +426,39 @@ public class Program
         builder.Logging.AddConsole();
         builder.Logging.SetMinimumLevel(LogLevel.Information);
 
+        builder.Services.ConfigureHttpJsonOptions(o =>
+        {
+            o.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+            o.SerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+        });
+
         var app = builder.Build();
         var logger = app.Logger;
 
         app.MapGet("/health", () =>
         {
             logger.LogInformation("GET /health at {NowUtc}", DateTime.UtcNow);
-            return Results.Ok(new { ok = true, ts = DateTime.UtcNow });
+            return Results.Ok(new { ok = true, ts = DateTime.UtcNow, uptimeSec = (DateTime.UtcNow - StartUtc).TotalSeconds });
         });
 
-        // Export + Train
-        app.MapPost("/train", async () =>
+        app.MapGet("/config", () => Results.Json(new
         {
+            esUrl = EsUrl,
+            metricsIndex = MetricsIndex,
+            apmTxIndex = ApmTxIndex,
+            apmMetricsIndex = ApmMetricsIndex,
+            apmSpanIndex = ApmSpanIndex,
+            apmErrorIndex = ApmErrorIndex,
+            perHourSize = PerHourSize,
+            exportMaxDop = ExportMaxDop
+        }, JsonOpts));
+
+        // ==========================
+        // Export + Train
+        // ==========================
+        app.MapPost("/train", async (HttpContext ctx) =>
+        {
+            var ct = ctx.RequestAborted;
             try
             {
                 var toUtc = DateTime.UtcNow;
@@ -411,25 +471,11 @@ public class Program
                 Directory.CreateDirectory(ApmSpanOutDir);
                 Directory.CreateDirectory(ApmErrorOutDir);
 
-                // Set to true to refresh export (kept false to avoid long runs)
-                //if (true)
-                //{
-                //    await ExportPerHourLimitedNdjson(MetricsIndex, fromUtc, toUtc, MetricsOutDir, BuildMetricsQueryBodyLimited, PerHourSize, logger);
-                //    await ExportPerHourLimitedNdjson(ApmTxIndex, fromUtc, toUtc, ApmTxOutDir, BuildApmTxQueryBodyLimited, PerHourSize, logger);
-                //    await ExportPerHourLimitedNdjson(ApmMetricsIndex, fromUtc, toUtc, ApmMetricsOutDir, BuildApmClrMetricQueryBodyLimited, PerHourSize, logger); // [APM-NEW]
-                //    await ExportPerHourLimitedNdjson(ApmSpanIndex, fromUtc, toUtc, ApmSpanOutDir, BuildApmSpanQueryBodyLimited, PerHourSize, logger);           // [APM-NEW]
-                //    await ExportPerHourLimitedNdjson(ApmErrorIndex, fromUtc, toUtc, ApmErrorOutDir, BuildApmErrorQueryBodyLimited, PerHourSize, logger);        // [APM-NEW]
-                //}
-                // Set to true to refresh export
-                if (true)
-                {
-                    // Each call handles: build per-day hour tasks -> Task.WaitAll(...) per day -> return after all days done
-                    ExportPerHourLimitedNdjsonParallel(MetricsIndex, fromUtc, toUtc, MetricsOutDir, BuildMetricsQueryBodyLimited, PerHourSize, logger, maxDegreeOfParallelism: 6);
-                    ExportPerHourLimitedNdjsonParallel(ApmTxIndex, fromUtc, toUtc, ApmTxOutDir, BuildApmTxQueryBodyLimited, PerHourSize, logger, maxDegreeOfParallelism: 6);
-                    ExportPerHourLimitedNdjsonParallel(ApmMetricsIndex, fromUtc, toUtc, ApmMetricsOutDir, BuildApmClrMetricQueryBodyLimited, PerHourSize, logger, maxDegreeOfParallelism: 6); // [APM-NEW]
-                    ExportPerHourLimitedNdjsonParallel(ApmSpanIndex, fromUtc, toUtc, ApmSpanOutDir, BuildApmSpanQueryBodyLimited, PerHourSize, logger, maxDegreeOfParallelism: 6); // [APM-NEW]
-                    ExportPerHourLimitedNdjsonParallel(ApmErrorIndex, fromUtc, toUtc, ApmErrorOutDir, BuildApmErrorQueryBodyLimited, PerHourSize, logger, maxDegreeOfParallelism: 6); // [APM-NEW]
-                }
+                ExportPerHourLimitedNdjsonParallel(MetricsIndex, fromUtc, toUtc, MetricsOutDir, BuildMetricsQueryBodyLimited, PerHourSize, logger, ExportMaxDop, ct);
+                ExportPerHourLimitedNdjsonParallel(ApmTxIndex, fromUtc, toUtc, ApmTxOutDir, BuildApmTxQueryBodyLimited, PerHourSize, logger, ExportMaxDop, ct);
+                ExportPerHourLimitedNdjsonParallel(ApmMetricsIndex, fromUtc, toUtc, ApmMetricsOutDir, BuildApmClrMetricQueryBodyLimited, PerHourSize, logger, ExportMaxDop, ct);
+                ExportPerHourLimitedNdjsonParallel(ApmSpanIndex, fromUtc, toUtc, ApmSpanOutDir, BuildApmSpanQueryBodyLimited, PerHourSize, logger, ExportMaxDop, ct);
+                ExportPerHourLimitedNdjsonParallel(ApmErrorIndex, fromUtc, toUtc, ApmErrorOutDir, BuildApmErrorQueryBodyLimited, PerHourSize, logger, ExportMaxDop, ct);
 
                 logger.LogInformation("POST /train: Building features...");
                 var ml = new MLContext(seed: 42);
@@ -449,8 +495,10 @@ public class Program
             }
         });
 
-        // Suggestions
-        app.MapGet("/suggestions", async () =>
+        // ==========================
+        // Suggestions (cards)
+        // ==========================
+        app.MapGet("/suggestions", async (HttpRequest req) =>
         {
             try
             {
@@ -460,7 +508,7 @@ public class Program
                     MetricsOutDir, ApmTxOutDir, ApmMetricsOutDir, ApmSpanOutDir, ApmErrorOutDir, logger);
 
                 if (features.Count == 0)
-                    return Results.Ok(new { generated_at = DateTime.UtcNow, results = Array.Empty<object>(), note = "No features. Train first." });
+                    return Results.Ok(new { generatedAt = DateTime.UtcNow, results = Array.Empty<object>(), note = "No features. Train first." });
 
                 var clusterPath = ModelTrainer.ClusterModelPath("models");
                 if (!File.Exists(clusterPath))
@@ -472,9 +520,19 @@ public class Program
 
                 var anomalyStats = AnomalyScoring.ComputeStats(features, Columns.AnomalyCols);
 
+                // Query params
+                var format = req.Query["format"].ToString();
+                var hostFilter = req.Query["host"].ToString();
+                var labelFilter = req.Query["label"].ToString();
+                var minConf = double.TryParse(req.Query["min_conf"], NumberStyles.Any, CultureInfo.InvariantCulture, out var mc) ? Math.Clamp(mc, 0, 1) : 0.0;
+                var limit = int.TryParse(req.Query["limit"], out var lim) && lim > 0 ? lim : int.MaxValue;
+
                 var results = new List<object>();
                 foreach (var h in features)
                 {
+                    if (!string.IsNullOrWhiteSpace(hostFilter) && !h.Host.Contains(hostFilter, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
                     try
                     {
                         apm.TryGetValue(h.Host, out var apmSig);
@@ -486,93 +544,7 @@ public class Program
                         var cpuSeries = await GetHourlyCpuSeriesForHostFromFiles(MetricsOutDir, h.Host, 7, logger);
                         var trendingUp = TrendGuard.IsTrendingUp(cpuSeries);
 
-                        var suggs = new List<object>();
-
-                        // === Scale-out ===
-                        if ((h.CpuP95 >= CpuHighThreshold && (apmSig?.ApproxRpmP95 ?? h.RpmP95) >= RpmPresentThreshold) ||
-                            ((apmSig?.LatencyP95Ms ?? 0) >= LatencyP95WarnMs && (apmSig?.ApproxRpmP95 ?? h.RpmP95) >= RpmPresentThreshold && (apmSig?.ErrorRate ?? 0) < 0.02))
-                        {
-                            var reason = h.CpuP95 >= CpuHighThreshold ? $"CPU p95 {h.CpuP95:P0}" : $"Latency p95 {(apmSig?.LatencyP95Ms ?? 0):0} ms";
-                            suggs.Add(new { type = "scale_out", message = $"{h.Host}: consider scaling out. Reason: {reason}, ~{(apmSig?.ApproxRpmP95 ?? h.RpmP95):0} rpm.", confidence = 0.72 });
-                        }
-
-                        // === Increase CPU ===
-                        if (h.CpuP95 >= CpuHighThreshold || h.CpuMax >= CpuVeryHighMax)
-                        {
-                            var targetCpuTier = MapCpuToTierUp(h.CpuP95, h.CpuMax);
-                            suggs.Add(new { type = "increase_cpu", message = $"{h.Host}: CPU high (p95 {h.CpuP95 * 100:0.#}% , max {h.CpuMax * 100:0.#}%) → bump to {targetCpuTier}.", confidence = 0.7 });
-                        }
-
-                        // === Increase Memory ===
-                        if (h.MemHeadroomGiB <= MemHeadroomLowGiB && h.AllocMemGiB > 0 && (h.MemP95GiB / Math.Max(h.AllocMemGiB, 0.01f)) >= MemTightRatio)
-                        {
-                            var target = Math.Max((int)Math.Ceiling(h.MemP95GiB * 1.25), (int)Math.Ceiling(h.AllocMemGiB));
-                            suggs.Add(new { type = "increase_memory", message = $"{h.Host}: memory near saturation p95 {h.MemP95GiB:0.0} GiB, max {h.MemUsedMaxGiB:0.0} GiB / alloc {h.AllocMemGiB:0.0} GiB → consider ≈ {target} GiB.", confidence = 0.7 });
-                        }
-
-                        // === Rightsize down ===
-                        if ((IsIdleCluster(co.ClusterId) || ao.Score >= 0.7f) && !trendingUp && h.DataCompleteness >= 0.9f)
-                        {
-                            var targetGiB = Math.Max(2, (int)Math.Ceiling(h.MemP95GiB * 1.25));
-                            suggs.Add(new { type = "rightsize_memory_down", message = $"{h.Host}: under-utilized memory; p95 {h.MemP95GiB:0.0} GiB vs alloc {h.AllocMemGiB:0.0} GiB → set ≈ {targetGiB} GiB.", confidence = Confidence(h, ao, trendingUp) });
-                            var downTier = MapCpuToTierDown(h.CpuP95);
-                            suggs.Add(new { type = "rightsize_cpu_down", message = $"{h.Host}: CPU p95 {h.CpuP95 * 100:0.#}% → smaller tier {downTier}.", confidence = Confidence(h, ao, trendingUp) });
-                        }
-
-                        // === Off-hours stop ===
-                        if (h.OffhoursIdleFraction >= 0.8f && !trendingUp)
-                            suggs.Add(new { type = "offhours_shutdown", message = $"{h.Host}: off-hours idle {h.OffhoursIdleFraction:P0} → schedule stop 00:00–07:00.", confidence = 0.65 });
-
-                        // === Consolidate / shutdown ===
-                        if (h.RpmP95 < 0.5 && h.CpuP95 < 0.04f && (h.NetInP95Kbps + h.NetOutP95Kbps) < 8)
-                            suggs.Add(new { type = "consolidate_or_shutdown", message = $"{h.Host}: near-zero traffic (rpm {h.RpmP95:0}), CPU p95 {h.CpuP95 * 100:0.#}%, net p95 {(h.NetInP95Kbps + h.NetOutP95Kbps):0.#} kbps.", confidence = 0.65 });
-
-                        // === APM error rate / latency ===
-                        if (apmSig is not null && apmSig.ErrorRate >= ErrorRateWarn && apmSig.ApproxRpmP95 >= RpmPresentThreshold)
-                            suggs.Add(new { type = "apm_error_rate", message = $"{h.Host}: high txn error rate {apmSig.ErrorRate:P1} (svc: {apmSig.TopService ?? "unknown"}). Investigate exceptions.", confidence = 0.8 });
-                        if (apmSig is not null && apmSig.LatencyP95Ms >= LatencyP95WarnMs && apmSig.ApproxRpmP95 >= RpmPresentThreshold)
-                            suggs.Add(new { type = "apm_high_latency", message = $"{h.Host}: txn p95 latency {apmSig.LatencyP95Ms:0} ms under ~{apmSig.ApproxRpmP95:0} rpm. Check DB/IO, N+1, caching, or scale-out.", confidence = 0.68 });
-
-                        // === APM missing ===
-                        if (apmSig is null && (h.RpmP95 >= 0.5 || h.CpuP95 >= 0.10f))
-                            suggs.Add(new { type = "apm_instrumentation", message = $"{h.Host}: activity present but no APM transactions found → enable APM agent/auto-instrumentation.", confidence = 0.6 });
-
-                        // [APM-NEW] === CLR / GC pressure ===
-                        if (clrSig is not null)
-                        {
-                            if (clrSig.GcTimePctP95 >= GcTimePctWarn)
-                                suggs.Add(new { type = "gc_pressure", message = $"{h.Host}: high GC time (p95 ~{clrSig.GcTimePctP95:0.#}% of CPU). Reduce allocations, pool objects, review LOH usage.", confidence = 0.7 });
-
-                            // Gen2+Gen3 as share of alloc mem
-                            var allocBytes = h.AllocMemGiB * 1024f * 1024f * 1024f;
-                            if (allocBytes > 0)
-                            {
-                                var gen23P95GiB = clrSig.Gen2SizeP95GiB + clrSig.Gen3SizeP95GiB;
-                                var share = gen23P95GiB / Math.Max(1e-6f, h.AllocMemGiB);
-                                if (share >= Gen23ShareWarn)
-                                    suggs.Add(new { type = "memory_fragmentation_or_leak", message = $"{h.Host}: Gen2+Gen3 ≈ {gen23P95GiB:0.00} GiB (~{share * 100:0.#}% of alloc). Possible LOH/fragmentation → review large arrays/strings, pinning, caching.", confidence = 0.68 });
-                            }
-
-                            if (clrSig.GcCountPerMinP95 >= 30) // aggressive churn
-                                suggs.Add(new { type = "excessive_gc_frequency", message = $"{h.Host}: GC count p95 ~{clrSig.GcCountPerMinP95:0} / min. Consider reducing per-request allocations, reuse buffers.", confidence = 0.65 });
-                        }
-
-                        // [APM-NEW] === Integrations & exceptions ===
-                        if (intSig is not null)
-                        {
-                            if (intSig.FailedHttpSpans >= FailedSpanWarn)
-                                suggs.Add(new { type = "integration_http_failures", message = $"{h.Host}: frequent HTTP span failures (~{intSig.FailedHttpSpans}). Check timeouts/DNS/SSL. Top ext: {intSig.TopExternalService ?? "n/a"}.", confidence = 0.72 });
-                            if (intSig.FailedDbSpans >= FailedSpanWarn)
-                                suggs.Add(new { type = "integration_db_failures", message = $"{h.Host}: frequent DB span failures (~{intSig.FailedDbSpans}). Verify connection pools, queries, locks.", confidence = 0.72 });
-                            if (intSig.FailedCacheSpans >= FailedSpanWarn)
-                                suggs.Add(new { type = "integration_cache_failures", message = $"{h.Host}: frequent cache span failures (~{intSig.FailedCacheSpans}). Check Redis/memcached endpoints and network.", confidence = 0.7 });
-
-                            if (intSig.TotalErrorDocs >= FailedSpanWarn && (!string.IsNullOrEmpty(intSig.TopExceptionType) || !string.IsNullOrEmpty(intSig.TopExceptionMessage)))
-                                suggs.Add(new { type = "apm_exceptions", message = $"{h.Host}: exceptions observed ({intSig.TotalErrorDocs}). Top: {intSig.TopExceptionType ?? "unknown"} {(intSig.TopExceptionMessage ?? "").Trim()}", confidence = 0.75 });
-                        }
-
-                        // Build metrics block
-                        var metrics = new
+                        var evidence = new
                         {
                             cpu_p95 = Math.Round(h.CpuP95 * 100, 2),
                             cpu_max = Math.Round(h.CpuMax * 100, 2),
@@ -588,7 +560,9 @@ public class Program
                             apm_latency_p95_ms = apmSig?.LatencyP95Ms,
                             hours_observed = h.HoursObserved,
                             total_docs = h.TotalDocs,
-                            // [APM-NEW] CLR & Integrations
+                            anomaly_score = Math.Round(ao.Score, 4),
+                            cluster_id = co.ClusterId,
+                            cpu_trending_up = trendingUp,
                             clr_gc_time_p95_pct = clrSig?.GcTimePctP95,
                             clr_gen2_p95_gib = clrSig?.Gen2SizeP95GiB,
                             clr_gen3_p95_gib = clrSig?.Gen3SizeP95GiB,
@@ -598,7 +572,111 @@ public class Program
                             top_exception = intSig?.TopExceptionType
                         };
 
-                        results.Add(new { host = h.Host, metrics, suggestions = suggs });
+                        var cardsByKind = new Dictionary<string, SuggestionCard>(StringComparer.OrdinalIgnoreCase);
+                        void Add(SuggestionCard c)
+                        {
+                            if (c.Confidence < minConf) return;
+                            if (!string.IsNullOrWhiteSpace(labelFilter) && (c.Labels?.All(l => !l.Equals(labelFilter, StringComparison.OrdinalIgnoreCase)) ?? false)) return;
+                            cardsByKind[c.Kind] = c;
+                        }
+
+                        if ((h.CpuP95 >= CpuHighThreshold && (apmSig?.ApproxRpmP95 ?? h.RpmP95) >= RpmPresentThreshold) ||
+                            ((apmSig?.LatencyP95Ms ?? 0) >= LatencyP95WarnMs && (apmSig?.ApproxRpmP95 ?? h.RpmP95) >= RpmPresentThreshold && (apmSig?.ErrorRate ?? 0) < 0.02))
+                        {
+                            var reason = h.CpuP95 >= CpuHighThreshold ? $"CPU p95 {h.CpuP95:P0}" : $"Latency p95 {(apmSig?.LatencyP95Ms ?? 0):0} ms";
+                            Add(ToCard(h, apmSig, clrSig, intSig, evidence, "scale_out", $"{h.Host}: consider scaling out. Reason: {reason}, ~{(apmSig?.ApproxRpmP95 ?? h.RpmP95):0} rpm.", 0.72, trendingUp));
+                        }
+
+                        if (h.CpuP95 >= CpuHighThreshold || h.CpuMax >= CpuVeryHighMax)
+                        {
+                            var targetCpuTier = MapCpuToTierUp(h.CpuP95, h.CpuMax);
+                            Add(ToCard(h, apmSig, clrSig, intSig, evidence, "increase_cpu",
+                                $"{h.Host}: CPU high (p95 {h.CpuP95 * 100:0.#}% , max {h.CpuMax * 100:0.#}%) → bump to {targetCpuTier}.", 0.70, trendingUp));
+                        }
+
+                        if (h.MemHeadroomGiB <= MemHeadroomLowGiB && h.AllocMemGiB > 0 && (h.MemP95GiB / Math.Max(h.AllocMemGiB, 0.01f)) >= MemTightRatio)
+                        {
+                            var target = Math.Max((int)Math.Ceiling(h.MemP95GiB * 1.25), (int)Math.Ceiling(h.AllocMemGiB));
+                            Add(ToCard(h, apmSig, clrSig, intSig, evidence, "increase_memory",
+                                $"{h.Host}: memory near saturation p95 {h.MemP95GiB:0.0} GiB, max {h.MemUsedMaxGiB:0.0} GiB / alloc {h.AllocMemGiB:0.0} GiB → consider ≈ {target} GiB.", 0.70, trendingUp));
+                        }
+
+                        var aoScoreHigh = AnomalyScoring.Score(h, anomalyStats, Columns.AnomalyCols).Score;
+                        if ((IsIdleCluster(co.ClusterId) || aoScoreHigh >= 0.7f) && !trendingUp && h.DataCompleteness >= 0.9f)
+                        {
+                            var targetGiB = Math.Max(2, (int)Math.Ceiling(h.MemP95GiB * 1.25));
+                            Add(ToCard(h, apmSig, clrSig, intSig, evidence, "rightsize_memory_down",
+                                $"{h.Host}: under-utilized memory; p95 {h.MemP95GiB:0.0} GiB vs alloc {h.AllocMemGiB:0.0} GiB → set ≈ {targetGiB} GiB.", Confidence(h, ao, trendingUp), trendingUp));
+                            var downTier = MapCpuToTierDown(h.CpuP95);
+                            Add(ToCard(h, apmSig, clrSig, intSig, evidence, "rightsize_cpu_down",
+                                $"{h.Host}: CPU p95 {h.CpuP95 * 100:0.#}% → smaller tier {downTier}.", Confidence(h, ao, trendingUp), trendingUp));
+                        }
+
+                        if (h.OffhoursIdleFraction >= 0.8f && !trendingUp)
+                            Add(ToCard(h, apmSig, clrSig, intSig, evidence, "offhours_shutdown",
+                                $"{h.Host}: off-hours idle {h.OffhoursIdleFraction:P0} → schedule stop 00:00–07:00.", 0.65, trendingUp));
+
+                        if (h.RpmP95 < 0.5 && h.CpuP95 < 0.04f && (h.NetInP95Kbps + h.NetOutP95Kbps) < 8)
+                            Add(ToCard(h, apmSig, clrSig, intSig, evidence, "consolidate_or_shutdown",
+                                $"{h.Host}: near-zero traffic (rpm {h.RpmP95:0}), CPU p95 {h.CpuP95 * 100:0.#}%, net p95 {(h.NetInP95Kbps + h.NetOutP95Kbps):0.#} kbps.", 0.65, trendingUp));
+
+                        if (apmSig is not null && apmSig.ErrorRate >= ErrorRateWarn && apmSig.ApproxRpmP95 >= RpmPresentThreshold)
+                            Add(ToCard(h, apmSig, clrSig, intSig, evidence, "apm_error_rate",
+                                $"{h.Host}: high txn error rate {apmSig.ErrorRate:P1} (svc: {apmSig.TopService ?? "unknown"}). Investigate exceptions.", 0.80, trendingUp));
+                        if (apmSig is not null && apmSig.LatencyP95Ms >= LatencyP95WarnMs && apmSig.ApproxRpmP95 >= RpmPresentThreshold)
+                            Add(ToCard(h, apmSig, clrSig, intSig, evidence, "apm_high_latency",
+                                $"{h.Host}: txn p95 latency {apmSig.LatencyP95Ms:0} ms under ~{apmSig.ApproxRpmP95:0} rpm. Check DB/IO, N+1, caching, or scale-out.", 0.68, trendingUp));
+
+                        if (apmSig is null && (h.RpmP95 >= 0.5 || h.CpuP95 >= 0.10f))
+                            Add(ToCard(h, apmSig, clrSig, intSig, evidence, "apm_instrumentation",
+                                $"{h.Host}: activity present but no APM transactions found → enable APM agent/auto-instrumentation.", 0.60, trendingUp));
+
+                        if (clrSig is not null)
+                        {
+                            if (clrSig.GcTimePctP95 >= GcTimePctWarn)
+                                Add(ToCard(h, apmSig, clrSig, intSig, evidence, "gc_pressure",
+                                    $"{h.Host}: high GC time (p95 ~{clrSig.GcTimePctP95:0.#}% of CPU). Reduce allocations, pool objects, review LOH usage.", 0.70, trendingUp));
+
+                            var allocBytes = h.AllocMemGiB * 1024f * 1024f * 1024f;
+                            if (allocBytes > 0)
+                            {
+                                var gen23P95GiB = (clrSig.Gen2SizeP95GiB + clrSig.Gen3SizeP95GiB);
+                                var share = gen23P95GiB / Math.Max(1e-6f, h.AllocMemGiB);
+                                if (share >= Gen23ShareWarn)
+                                    Add(ToCard(h, apmSig, clrSig, intSig, evidence, "memory_fragmentation_or_leak",
+                                        $"{h.Host}: Gen2+Gen3 ≈ {gen23P95GiB:0.00} GiB (~{share * 100:0.#}% of alloc). Possible LOH/fragmentation → review large arrays/strings, pinning, caching.", 0.68, trendingUp));
+                            }
+
+                            if (clrSig.GcCountPerMinP95 >= 30)
+                                Add(ToCard(h, apmSig, clrSig, intSig, evidence, "excessive_gc_frequency",
+                                    $"{h.Host}: GC count p95 ~{clrSig.GcCountPerMinP95:0}/min. Consider reducing per-request allocations, reuse buffers.", 0.65, trendingUp));
+                        }
+
+                        if (intSig is not null)
+                        {
+                            if (intSig.FailedHttpSpans >= FailedSpanWarn)
+                                Add(ToCard(h, apmSig, clrSig, intSig, evidence, "integration_http_failures",
+                                    $"{h.Host}: frequent HTTP span failures (~{intSig.FailedHttpSpans}). Check timeouts/DNS/SSL. Top ext: {intSig.TopExternalService ?? "n/a"}.", 0.72, trendingUp));
+                            if (intSig.FailedDbSpans >= FailedSpanWarn)
+                                Add(ToCard(h, apmSig, clrSig, intSig, evidence, "integration_db_failures",
+                                    $"{h.Host}: frequent DB span failures (~{intSig.FailedDbSpans}). Verify connection pools, queries, locks.", 0.72, trendingUp));
+                            if (intSig.FailedCacheSpans >= FailedSpanWarn)
+                                Add(ToCard(h, apmSig, clrSig, intSig, evidence, "integration_cache_failures",
+                                    $"{h.Host}: frequent cache span failures (~{intSig.FailedCacheSpans}). Check Redis/memcached endpoints and network.", 0.70, trendingUp));
+
+                            if (intSig.TotalErrorDocs >= FailedSpanWarn && (!string.IsNullOrEmpty(intSig.TopExceptionType) || !string.IsNullOrEmpty(intSig.TopExceptionMessage)))
+                                Add(ToCard(h, apmSig, clrSig, intSig, evidence, "apm_exceptions",
+                                    $"{h.Host}: exceptions observed ({intSig.TotalErrorDocs}). Top: {intSig.TopExceptionType ?? "unknown"} {(intSig.TopExceptionMessage ?? "").Trim()}", 0.75, trendingUp));
+                        }
+
+                        var ordered = cardsByKind.Values
+                            .OrderByDescending(c => c.Severity)
+                            .ThenByDescending(c => c.Confidence)
+                            .Take(limit)
+                            .ToList();
+
+                        if (ordered.Count > 0)
+                            results.Add(new { host = h.Host, metrics = evidence, suggestions = ordered });
                     }
                     catch (Exception exHost)
                     {
@@ -606,7 +684,29 @@ public class Program
                     }
                 }
 
-                return Results.Json(new { generated_at = DateTime.UtcNow, results });
+                if (string.Equals(format, "markdown", StringComparison.OrdinalIgnoreCase))
+                {
+                    var md = new StringBuilder();
+                    md.AppendLine($"### Suggestions @ {DateTime.UtcNow:O}\n");
+                    foreach (dynamic item in results)
+                    {
+                        string host = item.host;
+                        md.AppendLine($"#### Host: **{host}**");
+                        foreach (SuggestionCard c in item.suggestions)
+                        {
+                            md.AppendLine($"- **{c.Title}**  ");
+                            if (!string.IsNullOrEmpty(c.Why)) md.AppendLine($"  - _Why_: {c.Why}");
+                            if (!string.IsNullOrEmpty(c.Action)) md.AppendLine($"  - _Action_: {c.Action}");
+                            if (!string.IsNullOrEmpty(c.Impact)) md.AppendLine($"  - _Impact_: {c.Impact}");
+                            if (!string.IsNullOrEmpty(c.RiskIfIgnored)) md.AppendLine($"  - _Risk_: {c.RiskIfIgnored}");
+                            md.AppendLine($"  - _Severity_: {c.Severity} · _Confidence_: {c.Confidence:0.00} · _Labels_: {string.Join(", ", c.Labels)}\n");
+                        }
+                        md.AppendLine();
+                    }
+                    return Results.Text(md.ToString(), "text/markdown", Encoding.UTF8);
+                }
+
+                return Results.Json(new { generatedAt = DateTime.UtcNow, results }, JsonOpts);
             }
             catch (Exception ex)
             {
@@ -618,7 +718,167 @@ public class Program
         await app.RunAsync();
     }
 
-    // -------------------- Helpers --------------------
+    // ==========================
+    // Helper: build SuggestionCard
+    // ==========================
+    private static SuggestionCard ToCard(HostFeatures h, ApmSignals? apmSig, ApmClrSignals? clrSig, ApmIntegrationSignals? intSig,
+                                         object evidence, string kind, string rawMessage, double conf, bool trendingUp)
+    {
+        string host = h.Host;
+        string title = rawMessage; // fallback
+        string why = string.Empty, action = string.Empty, impact = string.Empty, risk = string.Empty;
+        var severity = Severity.Info;
+        var labels = new List<string>();
+
+        switch (kind)
+        {
+            case "scale_out":
+                title = $"Scale out {host} (add 1–2 instances)";
+                why = $"Sustained load detected: CPU p95 ≈ {h.CpuP95:P0} " + (apmSig != null ? $"and txn p95 latency ≈ {apmSig.LatencyP95Ms:0} ms " : "") + $"under ~{(apmSig?.ApproxRpmP95 ?? h.RpmP95):0} rpm.";
+                action = "Increase replicas (e.g., K8s HPA +1/+2) and set autoscaling floor to current +1.";
+                impact = "Reduces latency spikes; keeps SLOs green.";
+                risk = "Ignoring may increase timeouts during bursts.";
+                severity = Severity.High;
+                labels.AddRange(new[] { "Performance", "Reliability" });
+                break;
+            case "increase_cpu":
+                var cpuTier = MapCpuToTierUp(h.CpuP95, h.CpuMax);
+                title = $"Increase CPU tier to {cpuTier}";
+                why = $"CPU is tight (p95 {h.CpuP95 * 100:0.#}% / max {h.CpuMax * 100:0.#}%).";
+                action = $"Resize VM/node group to {cpuTier} (or raise CPU limits/requests).";
+                impact = "Headroom for spikes; fewer throttles; smoother GC.";
+                risk = "Sustained throttling may cause elevated latency and errors.";
+                severity = h.CpuP95 >= 0.85 ? Severity.High : Severity.Medium;
+                labels.Add("Performance");
+                break;
+            case "increase_memory":
+                int targetGiB = Math.Max((int)Math.Ceiling(h.MemP95GiB * 1.25), (int)Math.Ceiling(h.AllocMemGiB));
+                title = $"Increase memory to ~{targetGiB} GiB";
+                why = $"Memory near saturation: p95 {h.MemP95GiB:0.0} GiB (max {h.MemUsedMaxGiB:0.0} GiB) vs alloc {h.AllocMemGiB:0.0} GiB.";
+                action = "Bump RAM one size up or split workloads; review in-process caches.";
+                impact = "Avoids OOM/GC stalls; stabilizes latency under load.";
+                risk = "Risk of OOM and process restarts if demand spikes.";
+                severity = Severity.High;
+                labels.AddRange(new[] { "Performance", "Reliability" });
+                break;
+            case "rightsize_memory_down":
+                int rightsized = Math.Max(2, (int)Math.Ceiling(h.MemP95GiB * 1.25));
+                title = $"Rightsize memory down to ~{rightsized} GiB";
+                why = $"Under‑utilized memory: p95 {h.MemP95GiB:0.0} GiB vs alloc {h.AllocMemGiB:0.0} GiB.";
+                action = "Choose the next lower RAM tier or reduce container limits.";
+                impact = "Cuts infra cost with minimal risk.";
+                severity = Severity.Medium;
+                labels.Add("Cost");
+                break;
+            case "rightsize_cpu_down":
+                var downTier = MapCpuToTierDown(h.CpuP95);
+                title = $"Rightsize CPU down to {downTier}";
+                why = $"CPU p95 {h.CpuP95 * 100:0.#}% with no upward trend detected.";
+                action = $"Select the smaller CPU tier {downTier} or reduce requests/limits.";
+                impact = "Reduces monthly compute cost.";
+                severity = Severity.Medium;
+                labels.Add("Cost");
+                break;
+            case "offhours_shutdown":
+                title = "Schedule nightly shutdown (00:00–07:00)";
+                why = $"Off-hours idle {h.OffhoursIdleFraction:P0}.";
+                action = "Define a cron to stop/start nodes during quiet hours.";
+                impact = "Direct cost savings during idle windows.";
+                severity = Severity.Low;
+                labels.AddRange(new[] { "Cost", "Operations" });
+                break;
+            case "consolidate_or_shutdown":
+                title = "Consolidate or shut down idle host";
+                why = $"Near-zero traffic (rpm {h.RpmP95:0}), CPU p95 {h.CpuP95 * 100:0.#}%, net p95 {(h.NetInP95Kbps + h.NetOutP95Kbps):0.#} kbps.";
+                action = "Migrate remaining workloads and delete/stop node.";
+                impact = "Eliminates waste; simplifies ops.";
+                severity = Severity.Medium;
+                labels.AddRange(new[] { "Cost", "Operations" });
+                break;
+            case "apm_error_rate":
+                title = "Investigate high transaction error rate";
+                why = $"Txn error rate {(apmSig?.ErrorRate ?? 0):P1}" + (apmSig?.TopService != null ? $" (service: {apmSig.TopService})." : ".");
+                action = "Check recent deployments, exception logs, dependency health; add canaries/rollbacks.";
+                impact = "Improves reliability and customer experience.";
+                risk = "Ongoing failures can corrupt data or trigger incidents.";
+                severity = Severity.High;
+                labels.Add("Reliability");
+                break;
+            case "apm_high_latency":
+                title = "Reduce high p95 latency";
+                why = $"Txn p95 {(apmSig?.LatencyP95Ms ?? 0):0} ms @ ~{(apmSig?.ApproxRpmP95 ?? h.RpmP95):0} rpm.";
+                action = "Profile hot paths, review DB queries and caches; consider scale-out if CPU is high.";
+                impact = "Improves response time and SLO compliance.";
+                severity = Severity.High;
+                labels.Add("Performance");
+                break;
+            case "apm_instrumentation":
+                title = "Enable APM instrumentation";
+                why = "Activity detected but no APM transactions were found.";
+                action = "Install/enable APM agent or auto-instrumentation for the service.";
+                impact = "Unlocks visibility for latency/errors and speeds troubleshooting.";
+                severity = Severity.Low;
+                labels.Add("Operations");
+                break;
+            case "gc_pressure":
+                title = "Reduce GC pressure";
+                why = $"GC time p95 ~{(clrSig?.GcTimePctP95 ?? 0):0.#}% of CPU.";
+                action = "Reduce allocations, pool buffers, avoid large object churn.";
+                impact = "Smoother latency and lower CPU.";
+                severity = Severity.Medium;
+                labels.Add("Performance");
+                break;
+            case "memory_fragmentation_or_leak":
+                title = "Investigate LOH/fragmentation risk";
+                why = $"Gen2+Gen3 ≈ {(clrSig != null ? (clrSig.Gen2SizeP95GiB + clrSig.Gen3SizeP95GiB) : 0):0.00} GiB of alloc.";
+                action = "Audit large arrays/strings, pinning, caches, and memory pools.";
+                impact = "Prevents memory bloat and pauses.";
+                severity = Severity.Medium;
+                labels.AddRange(new[] { "Performance", "Reliability" });
+                break;
+            case "excessive_gc_frequency":
+                title = "Reduce excessive GC frequency";
+                why = $"GC count p95 ~{(clrSig?.GcCountPerMinP95 ?? 0):0}/min.";
+                action = "Reuse objects, avoid per-request allocations, check serializers.";
+                impact = "Lowers CPU and jitter.";
+                severity = Severity.Medium;
+                labels.Add("Performance");
+                break;
+            case "integration_http_failures":
+            case "integration_db_failures":
+            case "integration_cache_failures":
+                title = "Fix failing external integrations";
+                why = $"{kind.Replace('_', ' ')} observed." + (intSig?.TopExternalService != null ? $" Top external: {intSig.TopExternalService}." : "");
+                action = "Check timeouts, DNS, SSL, connection pools, and circuit breakers.";
+                impact = "Reduces user-visible errors and retries.";
+                severity = Severity.High;
+                labels.Add("Reliability");
+                break;
+            case "apm_exceptions":
+                title = "Investigate application exceptions";
+                why = $"Exceptions observed: {(intSig?.TotalErrorDocs ?? 0)}" + (intSig?.TopExceptionType != null ? $" (top: {intSig.TopExceptionType})." : ".");
+                action = "Triage stack traces, add guards, fix offending code path.";
+                impact = "Improves stability; reduces incident risk.";
+                severity = Severity.High;
+                labels.Add("Reliability");
+                break;
+        }
+
+        return new SuggestionCard
+        {
+            Kind = kind,
+            Title = title,
+            Why = why,
+            Action = action,
+            Impact = impact,
+            RiskIfIgnored = risk,
+            Severity = severity,
+            Confidence = Math.Round(conf, 2),
+            Labels = labels.ToArray(),
+            Evidence = evidence
+        };
+    }
+
     private static double Confidence(HostFeatures h, AnomalyOutput ao, bool trendingUp)
     {
         var baseConf = 0.5;
@@ -628,6 +888,7 @@ public class Program
         baseConf = Math.Clamp(baseConf, 0.1, 0.95);
         return Math.Round(baseConf, 2);
     }
+
     private static bool IsIdleCluster(uint clusterId) => clusterId == 1;
 
     private static string MapCpuToTierUp(float cpuP95, float cpuMax) =>
@@ -637,19 +898,34 @@ public class Program
             ( >= 0.75f, _) or (_, >= 0.90f) => "L (8 vCPU)",
             _ => "M (4 vCPU)"
         };
+
+    private static string MapCpuToTierDown(float cpuP95) =>
+        cpuP95 switch
+        {
+            < 0.05f => "XXS (0.5 vCPU)",
+            < 0.10f => "XS (1 vCPU)",
+            < 0.20f => "S (2 vCPU)",
+            < 0.35f => "M (4 vCPU)",
+            < 0.60f => "L (8 vCPU)",
+            _ => "Keep current"
+        };
+
     private static void LogException(ILogger logger, string prefix, Exception ex)
         => logger.LogError(ex, "{Prefix}: {Message}", prefix, ex.Message);
 
-    // -------------------- ES per-hour limited fetch --------------------
+    // ==========================
+    // ES per-hour limited fetch (parallel per-day; Task.WaitAll per day)
+    // ==========================
     private static HttpClient CreateEsHttp(ILogger logger)
     {
         logger.LogInformation("ES HttpClient -> {Url}", EsUrl);
-        var http = new HttpClient { BaseAddress = new Uri(EsUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromMinutes(3) };
+        var handler = new HttpClientHandler { AutomaticDecompression = DecompressionMethods.All };
+        var http = new HttpClient(handler) { BaseAddress = new Uri(EsUrl.TrimEnd('/') + "/"), Timeout = TimeSpan.FromMinutes(3) };
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("ApiKey", EsApiKeyBase64);
+        http.DefaultRequestHeaders.AcceptEncoding.Add(new System.Net.Http.Headers.StringWithQualityHeaderValue("gzip"));
         return http;
     }
-    // ==================== PARALLEL PER-DAY / PER-HOUR EXPORT ====================
-    // ==================== PARALLEL PER-DAY / PER-HOUR EXPORT ====================
+
     private static void ExportPerHourLimitedNdjsonParallel(
         string indexPattern,
         DateTime fromUtc,
@@ -658,12 +934,12 @@ public class Program
         Func<DateTime, DateTime, int, string> buildLimitedBody,
         int size,
         ILogger logger,
-        int maxDegreeOfParallelism = 6) // throttle to protect ES
+        int maxDegreeOfParallelism,
+        CancellationToken ct)
     {
         Directory.CreateDirectory(outDir);
         using var http = CreateEsHttp(logger);
 
-        // Align to the hour
         fromUtc = new DateTime(fromUtc.Year, fromUtc.Month, fromUtc.Day, fromUtc.Hour, 0, 0, DateTimeKind.Utc);
         toUtc = new DateTime(toUtc.Year, toUtc.Month, toUtc.Day, toUtc.Hour, 0, 0, DateTimeKind.Utc);
 
@@ -675,11 +951,9 @@ public class Program
             var dayStart = day;
             var dayEnd = day.AddDays(1);
 
-            // Hours within the requested window
             var hours = new List<DateTime>();
             for (var h = dayStart; h < dayEnd && h < toUtc; h = h.AddHours(1))
                 if (h >= fromUtc) hours.Add(h);
-
             if (hours.Count == 0) continue;
 
             logger.LogInformation("────────────────────────────────────────────────────────");
@@ -689,90 +963,84 @@ public class Program
 
             var taskList = new List<Task>(hours.Count);
             var dailyStopwatch = System.Diagnostics.Stopwatch.StartNew();
-            var dailySuccess = 0;
-            var dailySkipped = 0;
-            var dailyFailed = 0;
-            long dailyBytes = 0;
+            var dailySuccess = 0; var dailySkipped = 0; var dailyFailed = 0; long dailyBytes = 0;
+            int issued = 0;
 
             foreach (var windowStart in hours)
             {
-                var ws = windowStart; // capture
-                var we = ws.AddHours(1);
-                var hourLabel = ws.ToString("dd-MM HH:mm");      // e.g., "21-09 00:00"
+                ct.ThrowIfCancellationRequested();
+                var ws = windowStart; var we = ws.AddHours(1);
+                var hourLabel = ws.ToString("dd-MM HH:mm");
                 var fileName = Path.Combine(outDir, $"{esIndexSafe}_{ws:yyyyMMdd_HH}.ndjson");
-
-                logger.LogInformation("[{Hour}] Task CREATED -> {File}", hourLabel, fileName);
 
                 if (File.Exists(fileName))
                 {
-                    logger.LogInformation("[{Hour}] Task SKIPPED (file exists) -> {File}", hourLabel, fileName);
-                    dailySkipped++;
-                    continue;
+                    logger.LogInformation("[{Hour}] SKIP (exists) -> {File}", hourLabel, fileName);
+                    dailySkipped++; continue;
                 }
+
+                logger.LogInformation("[{Hour}] CREATE task -> {File}", hourLabel, fileName);
 
                 var t = Task.Run(async () =>
                 {
-                    await throttle.WaitAsync();
+                    await throttle.WaitAsync(ct);
                     var sw = System.Diagnostics.Stopwatch.StartNew();
                     try
                     {
-                        logger.LogInformation("[{Hour}] Task START   | Window {From} → {To} | Size={Size}",
-                            hourLabel, ws.ToString("o"), we.ToString("o"), size);
+                        logger.LogInformation("[{Hour}] START   | Window {From} → {To} | Size={Size}", hourLabel, ws.ToString("o"), we.ToString("o"), size);
 
                         var body = buildLimitedBody(ws, we, size);
                         using var req = new HttpRequestMessage(HttpMethod.Post, $"{indexPattern}/_search")
                         { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 
-                        using var res = await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
+                        var res = await WithRetry(async () => await http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct),
+                                                  retries: 3, TimeSpan.FromSeconds(2), logger, $"ES _search {hourLabel}");
+
                         res.EnsureSuccessStatusCode();
 
-                        await using var resStream = await res.Content.ReadAsStreamAsync();
-                        using var doc = await JsonDocument.ParseAsync(resStream);
+                        await using var resStream = await res.Content.ReadAsStreamAsync(ct);
+                        using var doc = await JsonDocument.ParseAsync(resStream, cancellationToken: ct);
 
                         await using var fs = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.Read, 1 << 20, FileOptions.SequentialScan);
                         using var writer = new StreamWriter(fs, new UTF8Encoding(false));
 
                         int docs = 0;
-                        if (doc.RootElement.TryGetProperty("hits", out var hits) &&
-                            hits.TryGetProperty("hits", out var arr) && arr.ValueKind == JsonValueKind.Array)
+                        if (doc.RootElement.TryGetProperty("hits", out var hits) && hits.TryGetProperty("hits", out var arr) && arr.ValueKind == JsonValueKind.Array)
                         {
                             foreach (var h in arr.EnumerateArray())
                             {
-                                if (h.TryGetProperty("_source", out var src))
-                                {
-                                    await writer.WriteLineAsync(src.GetRawText());
-                                    docs++;
-                                }
+                                if (h.TryGetProperty("_source", out var src)) { await writer.WriteLineAsync(src.GetRawText()); docs++; }
                             }
                         }
-
                         await writer.FlushAsync();
                         sw.Stop();
 
-                        long written = 0;
-                        try { written = new FileInfo(fileName).Length; } catch { /* ignore */ }
+                        if (docs == 0)
+                        {
+                            try { writer.Dispose(); fs.Dispose(); File.Delete(fileName); } catch { }
+                        }
 
+                        long written = 0; try { if (File.Exists(fileName)) written = new FileInfo(fileName).Length; } catch { }
                         Interlocked.Add(ref dailyBytes, written);
                         Interlocked.Increment(ref dailySuccess);
 
-                        logger.LogInformation("[{Hour}] Task DONE    | docs={Docs} bytes={Bytes} in {Ms} ms -> {File}",
-                            hourLabel, docs, written, sw.ElapsedMilliseconds, fileName);
+                        logger.LogInformation("[{Hour}] DONE    | docs={Docs} bytes={Bytes} in {Ms} ms -> {File}", hourLabel, docs, written, sw.ElapsedMilliseconds, fileName);
                     }
                     catch (Exception ex)
                     {
                         sw.Stop();
                         Interlocked.Increment(ref dailyFailed);
-                        LogException(logger, $"[{hourLabel}] Task FAILED after {sw.ElapsedMilliseconds} ms", ex);
-
-                        try { if (File.Exists(fileName)) File.Delete(fileName); } catch { /* ignore */ }
+                        LogException(logger, $"[{hourLabel}] FAILED after {sw.ElapsedMilliseconds} ms", ex);
+                        try { if (File.Exists(fileName)) File.Delete(fileName); } catch { }
                     }
-                    finally
-                    {
-                        throttle.Release();
-                    }
-                });
+                    finally { throttle.Release(); }
+                }, ct);
 
                 taskList.Add(t);
+                issued++;
+                var pct = (double)issued / hours.Count * 100.0;
+                if (issued % Math.Max(1, hours.Count / 6) == 0)
+                    logger.LogInformation("DAY {Day} | Progress {Issued}/{Total} ({Pct:0.#}%)", dayStart.ToString("yyyy-MM-dd"), issued, hours.Count, pct);
             }
 
             if (taskList.Count == 0)
@@ -784,8 +1052,7 @@ public class Program
             logger.LogInformation("DAY {DayStamp} | EXECUTING {Count} hour tasks in parallel (maxDOP={DOP})...",
                 dayStart.ToString("yyyy-MM-dd"), taskList.Count, maxDegreeOfParallelism);
 
-            // *** EXACTLY as requested: wait for the per-day list of tasks ***
-            Task.WaitAll(taskList.ToArray());
+            Task.WaitAll(taskList.ToArray(), ct);
 
             dailyStopwatch.Stop();
             logger.LogInformation("DAY {DayStamp} | SUMMARY: ok={Ok} skipped={Skipped} failed={Failed} bytes={Bytes} in {Secs:0.00}s",
@@ -794,49 +1061,25 @@ public class Program
         }
     }
 
-    private static async Task ExportPerHourLimitedNdjson(
-        string indexPattern,
-        DateTime fromUtc,
-        DateTime toUtc,
-        string outDir,
-        Func<DateTime, DateTime, int, string> buildLimitedBody,
-        int size,
-        ILogger logger)
+    private static async Task<T> WithRetry<T>(Func<Task<T>> action, int retries, TimeSpan delay, ILogger logger, string purpose)
     {
-        Directory.CreateDirectory(outDir);
-        using var http = CreateEsHttp(logger);
-        for (var windowStart = fromUtc; windowStart < toUtc; windowStart = windowStart.AddHours(1))
+        int attempt = 0;
+        for (; ; )
         {
-            var windowEnd = windowStart.AddHours(1);
-            var fileName = Path.Combine(outDir, $"{SanitizeIndex(indexPattern)}_{windowStart:yyyyMMdd_HH}.ndjson");
-            if (File.Exists(fileName)) { logger.LogInformation("Skip exists {File}", fileName); continue; }
-
-            try
+            try { return await action(); }
+            catch (Exception ex)
             {
-                var body = buildLimitedBody(windowStart, windowEnd, size);
-                using var req = new HttpRequestMessage(HttpMethod.Post, $"{indexPattern}/_search")
-                { Content = new StringContent(body, Encoding.UTF8, "application/json") };
-                using var res = await http.SendAsync(req);
-                res.EnsureSuccessStatusCode();
-
-                using var doc = await JsonDocument.ParseAsync(await res.Content.ReadAsStreamAsync());
-                await using var fs = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.Read, 1 << 20, FileOptions.SequentialScan);
-                using var writer = new StreamWriter(fs, new UTF8Encoding(false));
-
-                if (doc.RootElement.TryGetProperty("hits", out var hits) &&
-                    hits.TryGetProperty("hits", out var arr) && arr.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var h in arr.EnumerateArray())
-                        if (h.TryGetProperty("_source", out var src))
-                            await writer.WriteLineAsync(src.GetRawText());
-                }
-                logger.LogInformation("Wrote {File}", fileName);
+                attempt++;
+                if (attempt > retries) throw;
+                logger.LogWarning(ex, "{Purpose}: retry {Attempt}/{Retries} after {Delay}s", purpose, attempt, retries, delay.TotalSeconds);
+                await Task.Delay(TimeSpan.FromMilliseconds(delay.TotalMilliseconds * Math.Pow(2, attempt - 1))); // backoff
             }
-            catch (Exception ex) { LogException(logger, $"Export hour {windowStart:yyyy-MM-dd HH}", ex); }
         }
-        static string SanitizeIndex(string idx) => string.Concat(idx.Where(c => char.IsLetterOrDigit(c) || c is '-' or '_')).Trim('_');
     }
 
+    // ==========================
+    // ES Query builders (raw string literals)
+    // ==========================
     private static string BuildMetricsQueryBodyLimited(DateTime gte, DateTime lt, int size)
     {
         var gteS = gte.ToString("o", CultureInfo.InvariantCulture);
@@ -869,7 +1112,7 @@ public class Program
 }}";
     }
 
-    // [APM-NEW] APM metric (CLR/GC)
+
     private static string BuildApmClrMetricQueryBodyLimited(DateTime gte, DateTime lt, int size)
     {
         var gteS = gte.ToString("o", CultureInfo.InvariantCulture);
@@ -890,7 +1133,6 @@ public class Program
 }}";
     }
 
-    // [APM-NEW] APM spans (to detect integration failures)
     private static string BuildApmSpanQueryBodyLimited(DateTime gte, DateTime lt, int size)
     {
         var gteS = gte.ToString("o", CultureInfo.InvariantCulture);
@@ -910,7 +1152,6 @@ public class Program
 }}";
     }
 
-    // [APM-NEW] APM errors (exceptions)
     private static string BuildApmErrorQueryBodyLimited(DateTime gte, DateTime lt, int size)
     {
         var gteS = gte.ToString("o", CultureInfo.InvariantCulture);
@@ -929,51 +1170,9 @@ public class Program
 }}";
     }
 
-    // -------------------- Build features + APM signals from files --------------------
-    private sealed class Acc
-    {
-        public P2Quantile MemP95 = new(0.95);
-        public P2Quantile CpuP95 = new(0.95);
-        public P2Quantile NetInP95 = new(0.95);
-        public P2Quantile NetOutP95 = new(0.95);
-        public double MemTotalMaxBytes;
-        public double MemUsedMaxBytes;
-        public double CpuMax;         // 0..1
-        public double NetInMaxBytes;
-        public double NetOutMaxBytes;
-        public long TotalDocs;
-        public long IdleDocs;
-        public long OffIdleDocs;
-        public HashSet<string> Hours = new(); // yyyyMMddHH
-    }
-    private sealed class ApmAcc
-    {
-        public long Total;
-        public long Fail;
-        public P2Quantile P95Latency = new(0.95); // microseconds
-        public Dictionary<string, int> ServiceCounts = new(StringComparer.OrdinalIgnoreCase);
-        public Dictionary<string, int> PerMinute = new(); // yyyyMMddHHmm -> count
-    }
-    // [APM-NEW]
-    private sealed class ClrAcc
-    {
-        public Dictionary<string, int> MinuteDocs = new(); // yyyyMMddHHmm -> docs
-        public Dictionary<string, double> MinuteGcCounts = new(); // same key
-        public Dictionary<string, double> MinuteGcTime = new();   // same key
-        public P2Quantile Gen2P95 = new(0.95);
-        public P2Quantile Gen3P95 = new(0.95);
-        public double Gen2Max, Gen3Max;
-    }
-    // [APM-NEW]
-    private sealed class IntAcc
-    {
-        public int FailedHttp, FailedDb, FailedCache;
-        public Dictionary<string, int> ExternalNames = new(StringComparer.OrdinalIgnoreCase);
-        public int ErrorDocs;
-        public Dictionary<string, int> ExType = new(StringComparer.OrdinalIgnoreCase);
-        public Dictionary<string, int> ExMsg = new(StringComparer.OrdinalIgnoreCase);
-    }
-
+    // ==========================
+    // Build features + APM signals from files
+    // ==========================
     private static async Task<(List<HostFeatures> features,
                                Dictionary<string, ApmSignals> apm,
                                Dictionary<string, ApmClrSignals> apmClr,
@@ -1069,7 +1268,6 @@ public class Program
             });
         }
 
-        // APM txn
         var apm = new Dictionary<string, ApmSignals>(StringComparer.OrdinalIgnoreCase);
         if (Directory.Exists(apmTxDir))
         {
@@ -1092,8 +1290,7 @@ public class Program
                         if (!double.IsNaN(durUs)) a.P95Latency.Add(durUs);
 
                         var svc = TryString(doc, "service.name");
-                        if (!string.IsNullOrEmpty(svc))
-                            a.ServiceCounts[svc] = a.ServiceCounts.TryGetValue(svc, out var c) ? c + 1 : 1;
+                        if (!string.IsNullOrEmpty(svc)) a.ServiceCounts[svc] = a.ServiceCounts.TryGetValue(svc, out var c) ? c + 1 : 1;
 
                         if (doc.TryGetProperty("@timestamp", out var tsProp))
                         {
@@ -1117,7 +1314,6 @@ public class Program
                 if (apm.TryGetValue(hf.Host, out var sig)) hf.RpmP95 = Math.Max(hf.RpmP95, sig.ApproxRpmP95);
         }
 
-        // [APM-NEW] CLR metrics
         var clr = new Dictionary<string, ApmClrSignals>(StringComparer.OrdinalIgnoreCase);
         if (Directory.Exists(apmMetricsDir))
         {
@@ -1137,13 +1333,8 @@ public class Program
 
                         double gcCount = TryNum(doc, "clr.gc.count");
                         double gcTime = TryNum(doc, "clr.gc.time");
-                        if (!double.IsNaN(gcCount))
-                        {
-                            a.MinuteDocs[key] = a.MinuteDocs.TryGetValue(key, out var n) ? n + 1 : 1;
-                            a.MinuteGcCounts[key] = a.MinuteGcCounts.TryGetValue(key, out var v) ? v + gcCount : gcCount;
-                        }
-                        if (!double.IsNaN(gcTime))
-                            a.MinuteGcTime[key] = a.MinuteGcTime.TryGetValue(key, out var v2) ? v2 + gcTime : gcTime;
+                        if (!double.IsNaN(gcCount)) { a.MinuteDocs[key] = a.MinuteDocs.TryGetValue(key, out var n) ? n + 1 : 1; a.MinuteGcCounts[key] = a.MinuteGcCounts.TryGetValue(key, out var v) ? v + gcCount : gcCount; }
+                        if (!double.IsNaN(gcTime)) a.MinuteGcTime[key] = a.MinuteGcTime.TryGetValue(key, out var v2) ? v2 + gcTime : gcTime;
 
                         void addP(P2Quantile q, ref double mx, string field)
                         {
@@ -1159,7 +1350,6 @@ public class Program
 
             foreach (var (host, a) in map)
             {
-                // crude per-minute p95 of counts/time
                 var gcCountQ = new P2Quantile(0.95);
                 var gcTimePctQ = new P2Quantile(0.95);
                 foreach (var key in a.MinuteDocs.Keys)
@@ -1167,9 +1357,7 @@ public class Program
                     var n = a.MinuteDocs[key];
                     var count = a.MinuteGcCounts.TryGetValue(key, out var c) ? c : 0d;
                     var time = a.MinuteGcTime.TryGetValue(key, out var t) ? t : 0d;
-                    gcCountQ.Add(count / Math.Max(1, n)); // average per doc in that minute
-                    // GC time unit unknown in your payload; treat as "milliseconds per sample", normalize to ~% guess
-                    // Here we just map to [0..100] crudely:
+                    gcCountQ.Add(count / Math.Max(1, n));
                     gcTimePctQ.Add(Math.Min(100.0, time));
                 }
 
@@ -1193,9 +1381,7 @@ public class Program
             }
         }
 
-        // [APM-NEW] spans/errors (integrations)
         var integ = new Dictionary<string, ApmIntegrationSignals>(StringComparer.OrdinalIgnoreCase);
-        // spans
         if (Directory.Exists(apmSpanDir))
         {
             var map = new Dictionary<string, IntAcc>(StringComparer.OrdinalIgnoreCase);
@@ -1233,10 +1419,9 @@ public class Program
                 integ[host] = new ApmIntegrationSignals { Host = host, FailedHttpSpans = a.FailedHttp, FailedDbSpans = a.FailedDb, FailedCacheSpans = a.FailedCache, TopExternalService = topExt };
             }
         }
-        // errors
         if (Directory.Exists(apmErrorDir))
         {
-            var map = integ; // enrich the same map
+            var map = integ; // enrich
             foreach (var file in Directory.EnumerateFiles(apmErrorDir, "*.ndjson", SearchOption.TopDirectoryOnly))
             {
                 try
@@ -1246,12 +1431,9 @@ public class Program
                         var host = TryString(doc, "host.name") ?? "";
                         if (string.IsNullOrEmpty(host)) continue;
                         if (!map.TryGetValue(host, out var s)) map[host] = s = new ApmIntegrationSignals { Host = host };
-
                         s.TotalErrorDocs++;
                         var type = TryString(doc, "error.exception.type") ?? "";
                         var msg = TryString(doc, "error.exception.message") ?? (TryString(doc, "error.log.message") ?? "");
-
-                        // We’ll keep only the most frequent via temp dictionaries; simpler: store first if null
                         if (string.IsNullOrEmpty(s.TopExceptionType) && !string.IsNullOrEmpty(type)) s.TopExceptionType = type;
                         if (string.IsNullOrEmpty(s.TopExceptionMessage) && !string.IsNullOrEmpty(msg)) s.TopExceptionMessage = msg;
                     }
@@ -1278,8 +1460,8 @@ public class Program
                     if (!doc.TryGetProperty("@timestamp", out var tsProp)) continue;
                     var ts = tsProp.GetDateTime().ToUniversalTime();
                     if (ts < from) continue;
-
                     if ((TryString(doc, "host.name") ?? "") != host) continue;
+
                     var hourKey = ts.ToString("yyyyMMddHH");
                     var cpu = TryNum(doc, "system.cpu.total.norm.pct");
                     if (double.IsNaN(cpu)) cpu = TryNum(doc, "system.process.cpu.total.norm.pct");
@@ -1295,7 +1477,9 @@ public class Program
         return perHour.Count == 0 ? Array.Empty<float>() : perHour.Values.Select(v => (float)(v.n == 0 ? 0 : v.sum / v.n)).ToArray();
     }
 
-    // -------------------- NDJSON helpers --------------------
+    // ==========================
+    // NDJSON helpers
+    // ==========================
     private static async IAsyncEnumerable<JsonElement> ReadNdjson(string path)
     {
         using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 1 << 20, FileOptions.SequentialScan);
@@ -1308,6 +1492,7 @@ public class Program
             yield return doc.RootElement.Clone();
         }
     }
+
     private static double TryNum(JsonElement root, string dottedPath)
     {
         if (root.TryGetProperty(dottedPath, out var v) && v.ValueKind == JsonValueKind.Number) return v.GetDouble();
@@ -1316,6 +1501,7 @@ public class Program
             if (first.TryGetProperty(parts[1], out var vv) && vv.ValueKind == JsonValueKind.Number) return vv.GetDouble();
         return double.NaN;
     }
+
     private static string? TryString(JsonElement root, string dottedPath)
     {
         if (root.TryGetProperty(dottedPath, out var v) && v.ValueKind == JsonValueKind.String) return v.GetString();
@@ -1325,15 +1511,49 @@ public class Program
         return null;
     }
 
+    // ===== Nested accumulators (no explicit private modifier to avoid parser confusion if braces ever mismatch)
+    sealed class Acc
+    {
+        public P2Quantile MemP95 = new(0.95);
+        public P2Quantile CpuP95 = new(0.95);
+        public P2Quantile NetInP95 = new(0.95);
+        public P2Quantile NetOutP95 = new(0.95);
+        public double MemTotalMaxBytes;
+        public double MemUsedMaxBytes;
+        public double CpuMax;
+        public double NetInMaxBytes;
+        public double NetOutMaxBytes;
+        public long TotalDocs;
+        public long IdleDocs;
+        public long OffIdleDocs;
+        public HashSet<string> Hours = new();
+    }
 
-    private static string MapCpuToTierDown(float cpuP95) =>
-        cpuP95 switch
-        {
-            < 0.05f => "XXS (0.5 vCPU)",
-            < 0.10f => "XS (1 vCPU)",
-            < 0.20f => "S (2 vCPU)",
-            < 0.35f => "M (4 vCPU)",
-            < 0.60f => "L (8 vCPU)",
-            _ => "Keep current"
-        };
+    sealed class ApmAcc
+    {
+        public long Total;
+        public long Fail;
+        public P2Quantile P95Latency = new(0.95);
+        public Dictionary<string, int> ServiceCounts = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, int> PerMinute = new();
+    }
+
+    sealed class ClrAcc
+    {
+        public Dictionary<string, int> MinuteDocs = new();
+        public Dictionary<string, double> MinuteGcCounts = new();
+        public Dictionary<string, double> MinuteGcTime = new();
+        public P2Quantile Gen2P95 = new(0.95);
+        public P2Quantile Gen3P95 = new(0.95);
+        public double Gen2Max, Gen3Max;
+    }
+
+    sealed class IntAcc
+    {
+        public int FailedHttp, FailedDb, FailedCache;
+        public Dictionary<string, int> ExternalNames = new(StringComparer.OrdinalIgnoreCase);
+        public int ErrorDocs;
+        public Dictionary<string, int> ExType = new(StringComparer.OrdinalIgnoreCase);
+        public Dictionary<string, int> ExMsg = new(StringComparer.OrdinalIgnoreCase);
+    }
 }
